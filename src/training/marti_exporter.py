@@ -45,6 +45,15 @@ class MARTITrajectory(BaseModel):
     trajectory: list[list[list[MARTITurn]]]  # [rounds][agents][turns]
 
 
+def build_debate_agent_graph() -> dict:
+    """Build agent graph for 1-solver debate architecture (Phase 1 decision).
+
+    Returns:
+        Dict with agents, spatial_masks, temporal_masks, num_rounds
+    """
+    return build_agent_graph(num_solvers=1)
+
+
 def build_agent_graph(num_solvers: int = 3) -> dict:
     """Build solver-verifier-judge agent graph with spatial/temporal masks.
 
@@ -189,6 +198,7 @@ def export_to_marti_format(
     entries: list[TrajectoryEntry],
     problem: str,
     label: str,
+    mode: str = "debate",
 ) -> MARTITrajectory:
     """Convert pipeline TrajectoryEntry list to MARTI nested list format.
 
@@ -196,10 +206,17 @@ def export_to_marti_format(
         entries: List of TrajectoryEntry objects
         problem: Problem text
         label: Ground truth label/answer
+        mode: Pipeline mode - "debate" for 1-solver, "baseline" for 3-solver (default: "debate")
 
     Returns:
         MARTITrajectory with nested list structure [rounds][agents][turns]
     """
+    # Build agent graph based on mode
+    if mode == "debate":
+        agent_graph = build_debate_agent_graph()  # num_solvers=1
+    else:
+        agent_graph = build_agent_graph()  # default num_solvers=3
+
     # Group entries by (round_idx, agent_name)
     # Structure: {round_idx: {agent_name: [entries]}}
     grouped = defaultdict(lambda: defaultdict(list))
