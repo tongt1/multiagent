@@ -1,0 +1,53 @@
+config_version: "v1.0"
+max_iterations: 7
+trajectory_output_dir: "trajectories"
+
+solver:
+  role: "solver"
+  model: "command-r-plus"
+  temperature: 0.7
+  max_tokens: 4096
+  system_prompt: "You are a problem-solving agent. Provide clear, step-by-step solutions."
+  prompt_template: |
+    Problem: {problem}
+
+    {feedback_section}
+
+    Provide your solution with clear reasoning.
+
+verifier:
+  role: "verifier"
+  model: "command-r"
+  temperature: 0.0
+  max_tokens: 2048
+  system_prompt: "You are a verification agent. Critically evaluate solutions for correctness and completeness."
+  prompt_template: |
+    Problem: {problem}
+
+    Proposed Solution: {solution}
+
+    Evaluate this solution. Check for:
+    1. Correctness of reasoning
+    2. Completeness of the answer
+    3. Any errors or gaps
+
+judge:
+  model: "command-r-plus"
+  temperature: 0.0
+  max_tokens: 2048
+  system_prompt: "You are a judge evaluating solution quality."
+  prompt_template: |
+    Problem: {problem}
+
+    Solution: {solution}
+
+    {rubric}
+
+    Evaluate the solution quality.
+  scoring_rubric: |
+    Score on a 0.0-1.0 scale:
+    - 1.0: Perfect solution, correct and complete
+    - 0.7-0.9: Good solution with minor issues
+    - 0.4-0.6: Partial solution, significant gaps
+    - 0.1-0.3: Poor solution, mostly incorrect
+    - 0.0: No meaningful solution provided

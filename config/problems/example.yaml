@@ -1,0 +1,5 @@
+description: "What is the sum of the first 10 prime numbers?"
+metadata:
+  domain: "mathematics"
+  difficulty: "easy"
+  expected_answer: "129"
