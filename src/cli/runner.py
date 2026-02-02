@@ -1,6 +1,8 @@
 """CLI runner for executing pipelines."""
 
+import asyncio
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +14,13 @@ from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, T
 from rich.table import Table
 
 from src.data.dataset_loader import DatasetLoader, Problem
+from src.infrastructure.distributed_executor import (
+    DistributedExecutor,
+    JobConfig,
+    JobInfo,
+    KjobsExecutor,
+    KubernetesExecutor,
+)
 from src.models.config import PipelineConfig
 from src.orchestration.batch_executor import BatchPipelineExecutor, BatchResult
 from src.orchestration.pipeline import PipelineResult, SolverVerifierJudgePipeline
@@ -338,3 +347,199 @@ def display_batch_result(result: BatchResult, console: Console) -> None:
             error_table.caption = f"Showing first 10 of {len(result.errors)} errors"
 
         console.print(error_table)
+
+
+async def run_submit(
+    batch_config_path: str,
+    executor_type: str,
+) -> str:
+    """Submit a distributed batch job.
+
+    Args:
+        batch_config_path: Path to batch configuration YAML
+        executor_type: Executor type ("kubernetes" or "kjobs")
+
+    Returns:
+        Job ID for status monitoring
+
+    Raises:
+        FileNotFoundError: If batch config not found
+        ImportError: If kubernetes library not installed
+    """
+    # Load batch configuration
+    config_file = Path(batch_config_path)
+    if not config_file.exists():
+        raise FileNotFoundError(f"Batch config not found: {batch_config_path}")
+
+    with open(config_file) as f:
+        batch_config = yaml.safe_load(f)
+
+    # Extract configuration sections
+    dataset_config = batch_config.get("dataset", {})
+    execution_config = batch_config.get("execution", {})
+    distributed_config = batch_config.get("distributed", {})
+    job_config_data = distributed_config.get("job", {})
+    pipeline_config_path = batch_config.get("pipeline_config", "config/pipeline.yaml")
+
+    # Load dataset
+    loader = DatasetLoader()
+    source = dataset_config.get("source", "math")
+    limit = dataset_config.get("limit")
+
+    logger.info(f"Loading dataset from source: {source} (limit: {limit})")
+    problems = loader.load(source, limit=limit)
+
+    if not problems:
+        raise ValueError(f"No problems loaded from source: {source}")
+
+    logger.info(f"Loaded {len(problems)} problems")
+
+    # Convert problems to dict format for serialization
+    problem_dicts = [
+        {
+            "id": p.id,
+            "problem": p.problem,
+            "domain": p.domain,
+            "metadata": p.metadata,
+            "ground_truth": p.ground_truth,
+        }
+        for p in problems
+    ]
+
+    # Build JobConfig
+    job_config = JobConfig(
+        name=job_config_data.get("name", "multiagent-batch"),
+        image=job_config_data.get("image", "multiagent:latest"),
+        namespace=job_config_data.get("namespace", "default"),
+        cpu_request=job_config_data.get("resources", {}).get("cpu_request", "2"),
+        cpu_limit=job_config_data.get("resources", {}).get("cpu_limit", "4"),
+        memory_request=job_config_data.get("resources", {}).get("memory_request", "8Gi"),
+        memory_limit=job_config_data.get("resources", {}).get("memory_limit", "16Gi"),
+        backoff_limit=job_config_data.get("backoff_limit", 3),
+        env_vars=job_config_data.get("env_vars", {}),
+    )
+
+    # Create executor
+    executor: DistributedExecutor
+    if executor_type == "kubernetes":
+        executor = KubernetesExecutor(in_cluster=False)
+    elif executor_type == "kjobs":
+        # Get kjobs config (API endpoint and key)
+        api_endpoint = distributed_config.get("kjobs_api_endpoint", "")
+        api_key = distributed_config.get("kjobs_api_key", "")
+        executor = KjobsExecutor(api_endpoint=api_endpoint, api_key=api_key)
+    else:
+        raise ValueError(f"Unknown executor type: {executor_type}")
+
+    # Submit job
+    logger.info(f"Submitting job to {executor_type} executor...")
+    job_id = await executor.submit_job(
+        problems=problem_dicts,
+        pipeline_config_path=pipeline_config_path,
+        job_config=job_config,
+    )
+
+    logger.info(f"Job submitted successfully: {job_id}")
+    return job_id
+
+
+async def run_status(
+    job_id: str,
+    executor_type: str,
+    watch: bool,
+    poll_interval: float,
+    console: Console,
+) -> None:
+    """Check status of a distributed job.
+
+    Args:
+        job_id: Job identifier
+        executor_type: Executor type ("kubernetes" or "kjobs")
+        watch: If True, poll until completion
+        poll_interval: Seconds between polls (for watch mode)
+        console: Rich Console for display
+    """
+    # Create executor
+    executor: DistributedExecutor
+    if executor_type == "kubernetes":
+        executor = KubernetesExecutor(in_cluster=False)
+    elif executor_type == "kjobs":
+        # For status checking, we don't need API credentials typically
+        # (assuming job_id contains enough info)
+        executor = KjobsExecutor(api_endpoint="", api_key="")
+    else:
+        raise ValueError(f"Unknown executor type: {executor_type}")
+
+    if watch:
+        # Watch mode: poll until completion
+        logger.info(f"Watching job {job_id} (poll interval: {poll_interval}s)")
+
+        start_time = time.monotonic()
+        prev_status = None
+
+        while True:
+            job_info = await executor.get_status(job_id)
+
+            # Display status if changed
+            if job_info.status != prev_status:
+                display_job_status(job_info, console)
+                prev_status = job_info.status
+
+            # Check if completed
+            if job_info.status in ["succeeded", "failed"]:
+                elapsed = time.monotonic() - start_time
+                console.print(
+                    f"\n[bold]Job completed in {elapsed:.1f}s[/bold]"
+                )
+                break
+
+            # Wait before next poll
+            await asyncio.sleep(poll_interval)
+
+    else:
+        # Single status check
+        job_info = await executor.get_status(job_id)
+        display_job_status(job_info, console)
+
+
+def display_job_status(job_info: JobInfo, console: Console) -> None:
+    """Display formatted job status.
+
+    Args:
+        job_info: JobInfo to display
+        console: Rich Console instance
+    """
+    # Status with color
+    status_color_map = {
+        "pending": "yellow",
+        "running": "blue",
+        "succeeded": "green",
+        "failed": "red",
+        "unknown": "dim",
+    }
+    status_color = status_color_map.get(job_info.status, "white")
+    status_text = f"[{status_color}]{job_info.status.upper()}[/{status_color}]"
+
+    # Build info lines
+    info_lines = [
+        f"[bold]Job:[/bold] {job_info.job_name}",
+        f"[bold]Namespace:[/bold] {job_info.namespace}",
+        f"[bold]Status:[/bold] {status_text}",
+    ]
+
+    if job_info.created_at:
+        info_lines.append(f"[bold]Created:[/bold] {job_info.created_at}")
+
+    if job_info.completed_at:
+        info_lines.append(f"[bold]Completed:[/bold] {job_info.completed_at}")
+
+    if job_info.num_pods > 0:
+        info_lines.append(
+            f"[bold]Pods:[/bold] {job_info.succeeded_pods}/{job_info.num_pods} succeeded, "
+            f"{job_info.failed_pods} failed"
+        )
+
+    if job_info.message:
+        info_lines.append(f"[bold]Message:[/bold] {job_info.message}")
+
+    console.print(Panel("\n".join(info_lines), title="Job Status", expand=False))
