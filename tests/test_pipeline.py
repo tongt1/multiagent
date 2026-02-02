@@ -6,9 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.judge import JudgeAgent
-from src.agents.solver import SolverAgent, SolverResponse
-from src.agents.verifier import VerifierAgent
+from src.agents.solver import SolverResponse
 from src.models.config import AgentConfig, JudgeConfig, PipelineConfig
 from src.models.evaluation import Judgment, VerificationResult
 from src.models.trajectory import TokenUsage
@@ -80,11 +78,11 @@ async def test_pipeline_completes_successfully(mock_config, mock_token_usage, tm
     )
 
     # Patch LLMClient to avoid actual API calls
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         # Create mock client instances
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         # Set up return values for generate calls
         mock_client.generate.side_effect = [
@@ -136,10 +134,10 @@ async def test_pipeline_respects_max_iterations(mock_config, mock_token_usage, t
         weaknesses=["Wrong"],
     )
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         # Set up return values - 3 solver-verifier iterations + 1 judge
         mock_client.generate.side_effect = [
@@ -195,10 +193,10 @@ async def test_pipeline_terminates_early_on_pass(mock_config, mock_token_usage, 
         weaknesses=[],
     )
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         mock_client.generate.side_effect = [
             (mock_solver_response_1, mock_token_usage),  # Solver iter 1
@@ -230,10 +228,10 @@ async def test_pipeline_result_fields(mock_config, mock_token_usage, tmp_path):
         score=0.75, reasoning="OK", strengths=["Good"], weaknesses=["Meh"]
     )
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         mock_client.generate.side_effect = [
             (mock_solver_response, mock_token_usage),
@@ -268,10 +266,10 @@ async def test_pipeline_cost_summary_breakdown(mock_config, mock_token_usage, tm
     mock_verif_response = VerificationResult(passed=True, confidence=0.9)
     mock_judgment = Judgment(score=0.8, reasoning="R", strengths=["S"], weaknesses=["W"])
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         mock_client.generate.side_effect = [
             (mock_solver_response, mock_token_usage),
@@ -310,10 +308,10 @@ async def test_pipeline_creates_trajectory_file(mock_config, mock_token_usage, t
     mock_verif_response = VerificationResult(passed=True, confidence=0.9)
     mock_judgment = Judgment(score=0.8, reasoning="R", strengths=["S"], weaknesses=["W"])
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         mock_client.generate.side_effect = [
             (mock_solver_response, mock_token_usage),
@@ -360,10 +358,10 @@ async def test_pipeline_cost_tracker_accumulates(mock_config, mock_token_usage, 
     mock_verif_response = VerificationResult(passed=True, confidence=0.9)
     mock_judgment = Judgment(score=0.8, reasoning="R", strengths=["S"], weaknesses=["W"])
 
-    with patch("src.orchestration.pipeline.LLMClient") as MockLLMClient:
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
         mock_client = MagicMock()
         mock_client.generate = AsyncMock()
-        MockLLMClient.return_value = mock_client
+        mock_llm_client_cls.return_value = mock_client
 
         mock_client.generate.side_effect = [
             (mock_solver_response, solver_usage),
