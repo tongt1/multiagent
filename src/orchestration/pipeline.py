@@ -43,7 +43,15 @@ class SolverVerifierJudgePipeline:
         """
         self.config = config
 
-        # Create LLM clients for each agent
+        # Route to baseline runner if mode is baseline
+        if self.config.mode == "baseline":
+            from src.orchestration.baseline_runner import BaselineRunner
+
+            self._baseline_runner = BaselineRunner(config)
+            # Skip debate pipeline initialization for baseline mode
+            return
+
+        # Create LLM clients for each agent (debate mode only)
         self.solver_client = LLMClient(
             model=config.solver.model,
             temperature=config.solver.temperature,
@@ -88,6 +96,14 @@ class SolverVerifierJudgePipeline:
         Returns:
             PipelineResult with all execution details
         """
+        # Route to baseline runner if mode is baseline
+        if self.config.mode == "baseline":
+            return await self._baseline_runner.run(
+                problem_description=problem_description,
+                problem_metadata=problem_metadata,
+            )
+
+        # DEBATE MODE EXECUTION BELOW
         # Generate run ID
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         run_id = f"run_{timestamp}_{self.config_hash}"
