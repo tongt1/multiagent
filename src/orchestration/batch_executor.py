@@ -67,6 +67,10 @@ class BatchPipelineExecutor:
             if problem.ground_truth:
                 metadata["ground_truth"] = problem.ground_truth
 
+            # Trajectory ID is passed from problem metadata (assigned by generate_trajectories.py)
+            if "trajectory_id" in problem.metadata:
+                metadata["trajectory_id"] = problem.metadata["trajectory_id"]
+
             # Run pipeline
             result = await pipeline.run(
                 problem_description=problem.problem, problem_metadata=metadata

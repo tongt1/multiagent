@@ -1,171 +1,464 @@
-"""Generate sample MARTI trajectory data for training validation.
-
-Creates synthetic but realistic trajectory entries matching the format
-produced by the inference pipeline (TrajectoryEntry model).
+"""Generate MATH 500 trajectories for debate and baseline conditions.
 
 Usage:
-    python scripts/generate_trajectories.py [--output data/sample_trajectories.jsonl] [--count 50]
+    python scripts/generate_trajectories.py --mode debate --config config/pipeline_math.yaml
+    python scripts/generate_trajectories.py --mode baseline --config config/pipeline_math.yaml
+    python scripts/generate_trajectories.py --mode both --config config/pipeline_math.yaml
 """
 
 import argparse
+import asyncio
 import json
 import random
-import uuid
-from datetime import datetime, timezone
+import sys
+import time
 from pathlib import Path
+from typing import Any
+
+from loguru import logger
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+from src.data.math500 import load_math500, get_math500_stats
+from src.models.config import PipelineConfig
+from src.orchestration.batch_executor import BatchPipelineExecutor, BatchResult
+from src.orchestration.baseline_runner import BaselineRunner
+from src.data.dataset_loader import Problem
 
 
-MATH_PROBLEMS = [
-    ("What is the sum of all integers from 1 to 100?", "5050"),
-    ("Solve for x: 2x + 5 = 17", "x = 6"),
-    ("What is the derivative of x^3 + 2x^2 - 5x + 1?", "3x^2 + 4x - 5"),
-    ("Find the area of a circle with radius 7.", "49*pi ≈ 153.94"),
-    ("What is 15! / 13!?", "210"),
-    ("Simplify: (3x^2 - 12) / (x - 2)", "3(x + 2) = 3x + 6"),
-    ("What is the integral of 2x dx from 0 to 3?", "9"),
-    ("Solve the system: x + y = 10, x - y = 4", "x = 7, y = 3"),
-    ("What is the GCD of 84 and 126?", "42"),
-    ("Find the 10th term of the arithmetic sequence 3, 7, 11, ...", "39"),
-    ("What is log_2(256)?", "8"),
-    ("Simplify: sqrt(50) + sqrt(18)", "8*sqrt(2)"),
-    ("How many ways can you arrange 5 books on a shelf?", "120"),
-    ("What is the probability of rolling a sum of 7 with two dice?", "6/36 = 1/6"),
-    ("Solve: x^2 - 5x + 6 = 0", "x = 2 or x = 3"),
-    ("What is the dot product of [1,2,3] and [4,5,6]?", "32"),
-    ("Convert 255 from decimal to binary.", "11111111"),
-    ("What is the limit of (sin x)/x as x approaches 0?", "1"),
-    ("Find the median of: 3, 7, 1, 9, 5, 2, 8", "5"),
-    ("What is the determinant of [[1,2],[3,4]]?", "-2"),
-]
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate MATH 500 trajectories for debate and baseline conditions",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
-AGENTS = ["solver_0", "solver_1", "solver_2", "verifier", "judge"]
-AGENT_ROLES = {
-    "solver_0": "solver",
-    "solver_1": "solver",
-    "solver_2": "solver",
-    "verifier": "verifier",
-    "judge": "judge",
-}
+    parser.add_argument(
+        "--mode",
+        required=True,
+        choices=["debate", "baseline", "both"],
+        help="Generation mode: debate, baseline, or both",
+    )
+
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to pipeline configuration YAML",
+    )
+
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of problems (for testing; default: all 500)",
+    )
+
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=10,
+        help="Maximum concurrent API calls (default: 10)",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        default="trajectories",
+        help="Base output directory (default: trajectories)",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42)",
+    )
+
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
+    return parser.parse_args()
 
 
-def generate_entry(
-    problem: str,
-    answer: str,
-    agent: str,
-    run_id: str,
-    step_id: int,
-    round_idx: int,
-) -> dict:
-    """Generate a single trajectory entry."""
-    role = AGENT_ROLES[agent]
+async def run_debate_mode(
+    problems: list[Problem],
+    config: PipelineConfig,
+    output_dir: Path,
+    concurrency: int,
+    console: Console,
+) -> BatchResult:
+    """Run trajectory generation in debate mode.
 
-    if role == "solver":
-        # Solver proposes a solution (sometimes wrong)
-        correct = random.random() < 0.7
-        if correct:
-            solution = answer
-            reward = 1.0
-        else:
-            # Generate a plausible but wrong answer
-            solution = f"Approximately {random.randint(1, 100)}"
-            reward = 0.0
-        action = "generate_solution"
-        output = {"solution": solution}
+    Args:
+        problems: List of MATH 500 problems
+        config: Pipeline configuration
+        output_dir: Output directory for debate trajectories
+        concurrency: Max concurrent executions
+        console: Rich console for output
 
-    elif role == "verifier":
-        # Verifier checks the solution
-        agrees = random.random() < 0.6
-        feedback = "The solution is correct." if agrees else "The solution contains errors. Let me recalculate."
-        reward = 0.8 if agrees else 0.3
-        action = "verify_solution"
-        output = {"feedback": feedback, "agrees": agrees}
+    Returns:
+        BatchResult from execution
+    """
+    logger.info(f"Running debate mode: {len(problems)} problems")
 
-    elif role == "judge":
-        # Judge assigns final score
-        score = round(random.uniform(0.3, 1.0), 2)
-        reward = score
-        action = "judge_solution"
-        output = {"score": score, "reasoning": f"Based on verification, confidence={score:.2f}"}
+    # Ensure config is in debate mode
+    config.mode = "debate"
+    config.trajectory_output_dir = str(output_dir)
 
-    else:
-        reward = 0.5
-        action = "unknown"
-        output = {"result": "unknown action"}
+    # Create batch executor
+    executor = BatchPipelineExecutor(config, max_concurrent=concurrency)
 
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "run_id": run_id,
-        "step_id": step_id,
-        "agent": agent,
-        "action": action,
-        "input": {"problem": problem, "prompt": f"Solve: {problem}"},
-        "output": output,
-        "metadata": {
-            "model_version": "1.0",
-            "config_hash": "sample_" + run_id[:8],
-            "tokens": random.randint(50, 500),
-            "cost_usd": round(random.uniform(0.001, 0.01), 4),
-            "agent_name": agent,
-            "agent_role": role,
-            "round_idx": round_idx,
-        },
-        "reward": reward,
-        "terminal": role == "judge",
-        "success": reward > 0.5 if role == "judge" else None,
+    # Run batch execution with progress tracking
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Debate mode...", total=len(problems))
+
+        completed_count = 0
+
+        def on_complete(problem: Problem, result: Any) -> None:
+            """Callback for progress updates."""
+            nonlocal completed_count
+            completed_count += 1
+            progress.update(task, advance=1)
+
+        batch_result = await executor.run_batch(problems, on_complete=on_complete)
+
+    return batch_result
+
+
+async def run_baseline_mode(
+    problems: list[Problem],
+    config: PipelineConfig,
+    output_dir: Path,
+    concurrency: int,
+    console: Console,
+) -> BatchResult:
+    """Run trajectory generation in baseline mode.
+
+    Args:
+        problems: List of MATH 500 problems
+        config: Pipeline configuration
+        output_dir: Output directory for baseline trajectories
+        concurrency: Max concurrent executions
+        console: Rich console for output
+
+    Returns:
+        BatchResult from execution
+    """
+    logger.info(f"Running baseline mode: {len(problems)} problems")
+
+    # Ensure config is in baseline mode
+    config.mode = "baseline"
+    config.trajectory_output_dir = str(output_dir)
+
+    # For baseline, we need to run each problem through BaselineRunner
+    # and collect results manually since BaselineRunner doesn't have batch executor
+    from src.orchestration.pipeline import PipelineResult
+
+    semaphore = asyncio.Semaphore(concurrency)
+    results: list[PipelineResult] = []
+    errors: list[dict[str, Any]] = []
+
+    start_time = time.monotonic()
+
+    async def run_single_baseline(problem: Problem, progress: Progress, task_id: Any) -> None:
+        """Run single baseline problem."""
+        async with semaphore:
+            try:
+                # Create fresh baseline runner
+                runner = BaselineRunner(config)
+
+                # Build metadata
+                metadata = {
+                    "problem_id": problem.id,
+                    "domain": problem.domain,
+                    **problem.metadata,
+                }
+                if problem.ground_truth:
+                    metadata["ground_truth"] = problem.ground_truth
+
+                # Run baseline
+                result = await runner.run(
+                    problem_description=problem.problem,
+                    problem_metadata=metadata,
+                )
+                results.append(result)
+
+            except Exception as e:
+                logger.error(f"Baseline failed for {problem.id}: {e}")
+                errors.append({
+                    "problem_id": problem.id,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                })
+            finally:
+                progress.update(task_id, advance=1)
+
+    # Run with progress tracking
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[yellow]Baseline mode...", total=len(problems))
+
+        tasks = [run_single_baseline(problem, progress, task) for problem in problems]
+        await asyncio.gather(*tasks)
+
+    elapsed = time.monotonic() - start_time
+
+    # Create batch result
+    batch_result = BatchResult(
+        total=len(problems),
+        succeeded=len(results),
+        failed=len(errors),
+        results=results,
+        errors=errors,
+        elapsed_seconds=elapsed,
+    )
+
+    return batch_result
+
+
+def print_summary(
+    mode: str,
+    batch_result: BatchResult,
+    output_dir: Path,
+    console: Console,
+) -> None:
+    """Print generation summary.
+
+    Args:
+        mode: Generation mode (debate or baseline)
+        batch_result: Batch execution result
+        output_dir: Output directory
+        console: Rich console for output
+    """
+    from rich.table import Table
+
+    # Create summary table
+    table = Table(title=f"{mode.capitalize()} Mode Summary")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="white")
+
+    table.add_row("Total problems", str(batch_result.total))
+    table.add_row("Succeeded", f"[green]{batch_result.succeeded}[/green]")
+    table.add_row("Failed", f"[red]{batch_result.failed}[/red]")
+    table.add_row("Success rate", f"{(batch_result.succeeded / batch_result.total * 100):.1f}%")
+    table.add_row("Elapsed time", f"{batch_result.elapsed_seconds:.2f}s")
+
+    # Calculate average metrics from results
+    if batch_result.results:
+        avg_cost = sum(r.total_cost for r in batch_result.results) / len(batch_result.results)
+        avg_tokens = sum(r.token_usage.total_tokens for r in batch_result.results) / len(batch_result.results)
+
+        # Count ground truth rewards
+        correct_count = sum(1 for r in batch_result.results if r.ground_truth_reward == 1.0)
+        incorrect_count = sum(1 for r in batch_result.results if r.ground_truth_reward == 0.0)
+
+        table.add_row("Avg cost per problem", f"${avg_cost:.4f}")
+        table.add_row("Avg tokens per problem", f"{avg_tokens:.0f}")
+        table.add_row("Correct solutions", f"[green]{correct_count}[/green]")
+        table.add_row("Incorrect solutions", f"[red]{incorrect_count}[/red]")
+        table.add_row("Accuracy", f"{(correct_count / len(batch_result.results) * 100):.1f}%")
+
+    table.add_row("Output directory", str(output_dir))
+
+    console.print(table)
+
+    # Show sample errors if any
+    if batch_result.errors:
+        console.print(f"\n[red]Errors encountered:[/red]")
+        for error in batch_result.errors[:5]:  # Show first 5
+            console.print(f"  - {error['problem_id']}: {error['error_message']}")
+        if len(batch_result.errors) > 5:
+            console.print(f"  ... and {len(batch_result.errors) - 5} more")
+
+
+def save_generation_metadata(
+    mode: str,
+    batch_result: BatchResult,
+    output_dir: Path,
+    problems: list[Problem],
+    args: argparse.Namespace,
+) -> None:
+    """Save generation metadata to JSON.
+
+    Args:
+        mode: Generation mode
+        batch_result: Batch execution result
+        output_dir: Output directory
+        problems: List of problems
+        args: Command line arguments
+    """
+    metadata = {
+        "mode": mode,
+        "total_problems": len(problems),
+        "succeeded": batch_result.succeeded,
+        "failed": batch_result.failed,
+        "elapsed_seconds": batch_result.elapsed_seconds,
+        "config_path": args.config,
+        "concurrency": args.concurrency,
+        "seed": args.seed,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
 
+    # Add accuracy if available
+    if batch_result.results:
+        correct_count = sum(1 for r in batch_result.results if r.ground_truth_reward == 1.0)
+        metadata["correct_solutions"] = correct_count
+        metadata["accuracy"] = correct_count / len(batch_result.results)
+        metadata["avg_cost_per_problem"] = sum(r.total_cost for r in batch_result.results) / len(batch_result.results)
+        metadata["avg_tokens_per_problem"] = sum(r.token_usage.total_tokens for r in batch_result.results) / len(batch_result.results)
 
-def generate_trajectories(count: int) -> list[dict]:
-    """Generate a set of trajectory entries."""
-    entries = []
+    metadata_path = output_dir / "generation_metadata.json"
+    with metadata_path.open("w") as f:
+        json.dump(metadata, f, indent=2)
 
-    for i in range(count):
-        problem, answer = random.choice(MATH_PROBLEMS)
-        run_id = str(uuid.uuid4())
-        step_id = 0
+    logger.info(f"Saved generation metadata to {metadata_path}")
 
-        # Round 0: Solvers (independent)
-        for solver in ["solver_0", "solver_1", "solver_2"]:
-            entry = generate_entry(problem, answer, solver, run_id, step_id, round_idx=0)
-            entries.append(entry)
-            step_id += 1
 
-        # Round 1: Verifier
-        entry = generate_entry(problem, answer, "verifier", run_id, step_id, round_idx=1)
-        entries.append(entry)
-        step_id += 1
+async def async_main() -> int:
+    """Async main function."""
+    args = parse_args()
+    console = Console()
 
-        # Round 2: Judge
-        entry = generate_entry(problem, answer, "judge", run_id, step_id, round_idx=2)
-        entries.append(entry)
+    # Setup logging
+    logger.remove()
+    if args.verbose:
+        logger.add(sys.stderr, level="DEBUG")
+    else:
+        logger.add(sys.stderr, level="INFO")
 
-    return entries
+    # Set random seed
+    random.seed(args.seed)
+
+    # Load MATH 500 dataset
+    console.print("[cyan]Loading MATH 500 dataset...[/cyan]")
+    problems = load_math500(seed=args.seed)
+
+    # Apply limit if specified
+    if args.limit:
+        problems = problems[:args.limit]
+        console.print(f"[yellow]Limited to first {args.limit} problems[/yellow]")
+
+    # Show dataset statistics
+    stats = get_math500_stats(problems)
+    console.print(f"[green]Loaded {stats['total']} problems[/green]")
+    console.print(f"Distribution by level: {dict(stats['per_level'])}")
+
+    # Assign sequential trajectory IDs to problems
+    for idx, problem in enumerate(problems):
+        problem.metadata["trajectory_id"] = idx
+
+    # Load pipeline config
+    from pydantic_yaml import parse_yaml_file_as
+    config = parse_yaml_file_as(PipelineConfig, args.config)
+
+    # Create base output directory
+    output_base = Path(args.output_dir)
+    output_base.mkdir(parents=True, exist_ok=True)
+
+    # Run generation based on mode
+    start_time = time.time()
+
+    try:
+        if args.mode == "debate":
+            output_dir = output_base / "debate"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            batch_result = await run_debate_mode(
+                problems=problems,
+                config=config,
+                output_dir=output_dir,
+                concurrency=args.concurrency,
+                console=console,
+            )
+
+            print_summary("debate", batch_result, output_dir, console)
+            save_generation_metadata("debate", batch_result, output_dir, problems, args)
+
+        elif args.mode == "baseline":
+            output_dir = output_base / "baseline"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            batch_result = await run_baseline_mode(
+                problems=problems,
+                config=config,
+                output_dir=output_dir,
+                concurrency=args.concurrency,
+                console=console,
+            )
+
+            print_summary("baseline", batch_result, output_dir, console)
+            save_generation_metadata("baseline", batch_result, output_dir, problems, args)
+
+        elif args.mode == "both":
+            # Run debate mode
+            console.print("\n[bold cyan]===== DEBATE MODE =====[/bold cyan]")
+            debate_dir = output_base / "debate"
+            debate_dir.mkdir(parents=True, exist_ok=True)
+
+            debate_result = await run_debate_mode(
+                problems=problems,
+                config=config,
+                output_dir=debate_dir,
+                concurrency=args.concurrency,
+                console=console,
+            )
+
+            print_summary("debate", debate_result, debate_dir, console)
+            save_generation_metadata("debate", debate_result, debate_dir, problems, args)
+
+            # Run baseline mode
+            console.print("\n[bold yellow]===== BASELINE MODE =====[/bold yellow]")
+            baseline_dir = output_base / "baseline"
+            baseline_dir.mkdir(parents=True, exist_ok=True)
+
+            baseline_result = await run_baseline_mode(
+                problems=problems,
+                config=config,
+                output_dir=baseline_dir,
+                concurrency=args.concurrency,
+                console=console,
+            )
+
+            print_summary("baseline", baseline_result, baseline_dir, console)
+            save_generation_metadata("baseline", baseline_result, baseline_dir, problems, args)
+
+            # Print combined summary
+            console.print("\n[bold green]===== OVERALL SUMMARY =====[/bold green]")
+            console.print(f"Total elapsed time: {time.time() - start_time:.2f}s")
+            console.print(f"Debate: {debate_result.succeeded}/{debate_result.total} succeeded")
+            console.print(f"Baseline: {baseline_result.succeeded}/{baseline_result.total} succeeded")
+
+        console.print("\n[green]✓[/green] Generation complete!")
+        return 0
+
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        logger.exception("Generation failed")
+        return 1
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate sample trajectory data")
-    parser.add_argument("--output", default="data/sample_trajectories.jsonl")
-    parser.add_argument("--count", type=int, default=50, help="Number of problem runs")
-    args = parser.parse_args()
-
-    entries = generate_trajectories(args.count)
-
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(output_path, "w") as f:
-        for entry in entries:
-            f.write(json.dumps(entry) + "\n")
-
-    print(f"Generated {len(entries)} trajectory entries ({args.count} problems × 5 agents)")
-    print(f"Written to: {output_path}")
-
-    # Stats
-    rewards = [e["reward"] for e in entries]
-    agents = set(e["agent"] for e in entries)
-    print(f"Agents: {sorted(agents)}")
-    print(f"Reward range: [{min(rewards):.2f}, {max(rewards):.2f}]")
-    print(f"Mean reward: {sum(rewards) / len(rewards):.4f}")
+    """Main entry point."""
+    try:
+        exit_code = asyncio.run(async_main())
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        console = Console()
+        console.print("\n[yellow]Interrupted by user[/yellow]")
+        sys.exit(130)
 
 
 if __name__ == "__main__":
