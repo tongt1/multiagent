@@ -9,6 +9,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from src.data.dataset_loader import Problem
+from src.evaluation.reward_calculator import RewardCalculator
 from src.models.config import PipelineConfig
 from src.orchestration.pipeline import PipelineResult, SolverVerifierJudgePipeline
 
@@ -37,6 +38,7 @@ class BatchPipelineExecutor:
         self.config = config
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.reward_calculator = RewardCalculator()
 
     async def run_one(self, problem: Problem) -> PipelineResult:
         """Run pipeline on a single problem.
@@ -69,6 +71,26 @@ class BatchPipelineExecutor:
             result = await pipeline.run(
                 problem_description=problem.problem, problem_metadata=metadata
             )
+
+            # Compute ground truth reward if available
+            if problem.ground_truth and problem.domain:
+                try:
+                    reward_score, reward_details = self.reward_calculator.compute_reward(
+                        solution=result.solution,
+                        ground_truth=problem.ground_truth,
+                        domain=problem.domain,
+                        metadata=problem.metadata,
+                    )
+                    result.ground_truth_reward = reward_score
+                    result.ground_truth_details = reward_details
+                    logger.info(
+                        f"Ground truth reward for {problem.id}: {reward_score:.3f} "
+                        f"(method: {reward_details.get('method', 'N/A')})"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to compute ground truth reward for {problem.id}: {e}")
+                    result.ground_truth_reward = None
+                    result.ground_truth_details = {"error": str(e)}
 
             logger.info(
                 f"Completed problem {problem.id}: "

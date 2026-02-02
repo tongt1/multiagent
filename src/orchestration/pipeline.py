@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from pydantic import BaseModel
@@ -28,6 +28,8 @@ class PipelineResult(BaseModel):
     trajectory_path: str
     token_usage: TokenUsage
     cost_summary: dict[str, Any]
+    ground_truth_reward: Optional[float] = None  # verifiable reward when ground truth available
+    ground_truth_details: Optional[dict[str, Any]] = None  # verification details
 
 
 class SolverVerifierJudgePipeline:
