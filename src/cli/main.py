@@ -9,7 +9,15 @@ from loguru import logger
 from rich.console import Console
 from rich.logging import RichHandler
 
-from src.cli.runner import display_batch_result, display_result, run_batch, run_single
+from src.cli.runner import (
+    display_batch_result,
+    display_job_status,
+    display_result,
+    run_batch,
+    run_single,
+    run_status,
+    run_submit,
+)
 
 
 def setup_logging(verbose: bool) -> None:
@@ -136,6 +144,91 @@ Examples:
         help="Enable debug logging",
     )
 
+    # ========== SUBMIT SUBCOMMAND (distributed job) ==========
+    submit_parser = subparsers.add_parser(
+        "submit",
+        help="Submit a batch job to distributed infrastructure",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Submit job using batch config
+  python -m src.cli.main submit --batch-config config/batch_config.yaml
+
+  # Submit with custom executor
+  python -m src.cli.main submit --batch-config config/batch_config.yaml --executor kjobs
+        """,
+    )
+
+    submit_parser.add_argument(
+        "--batch-config",
+        required=True,
+        help="Path to batch configuration YAML",
+    )
+
+    submit_parser.add_argument(
+        "--executor",
+        default="kubernetes",
+        choices=["kubernetes", "kjobs"],
+        help="Executor type (default: kubernetes)",
+    )
+
+    submit_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
+    # ========== STATUS SUBCOMMAND (check job status) ==========
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Check status of a distributed job",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Check job status once
+  python -m src.cli.main status multiagent-batch-20240201-120000
+
+  # Watch job status (polls every 10s)
+  python -m src.cli.main status multiagent-batch-20240201-120000 --watch
+
+  # Custom poll interval
+  python -m src.cli.main status multiagent-batch-20240201-120000 --watch --poll-interval 5
+        """,
+    )
+
+    status_parser.add_argument(
+        "job_id",
+        help="Job ID returned from submit command",
+    )
+
+    status_parser.add_argument(
+        "--executor",
+        default="kubernetes",
+        choices=["kubernetes", "kjobs"],
+        help="Executor type (default: kubernetes)",
+    )
+
+    status_parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch job status until completion",
+    )
+
+    status_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=10.0,
+        help="Poll interval in seconds for --watch (default: 10.0)",
+    )
+
+    status_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
 
     # Show help if no subcommand provided
@@ -204,6 +297,31 @@ async def async_main() -> int:
 
             # Display batch summary
             display_batch_result(batch_result, console)
+
+        elif args.command == "submit":
+            # Distributed job submission
+            logger.info(f"Loading batch config from: {args.batch_config}")
+            logger.info(f"Using executor: {args.executor}")
+
+            job_id = await run_submit(
+                batch_config_path=args.batch_config,
+                executor_type=args.executor,
+            )
+
+            console.print(f"[green]✓[/green] Job submitted: [bold]{job_id}[/bold]")
+            console.print(f"\nCheck status with: python -m src.cli.main status {job_id}")
+
+        elif args.command == "status":
+            # Job status check
+            logger.info(f"Checking status for job: {args.job_id}")
+
+            await run_status(
+                job_id=args.job_id,
+                executor_type=args.executor,
+                watch=args.watch,
+                poll_interval=args.poll_interval,
+                console=console,
+            )
 
         return 0
 
