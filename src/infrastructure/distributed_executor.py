@@ -614,3 +614,94 @@ class KjobsExecutor(DistributedExecutor):
             NotImplementedError: API not yet available
         """
         raise NotImplementedError("kjobs/apiary integration not implemented")
+
+
+class KjobsTrainingExecutor:
+    """Placeholder for kjobs/apiary training job integration.
+
+    This is a placeholder for Cohere's internal kjobs/apiary infrastructure for
+    distributed training jobs. Since no public API documentation is available,
+    this raises NotImplementedError.
+
+    For Ray cluster training, use RayTrainingExecutor from ray_training_executor.py.
+
+    When the API becomes available, implement:
+    1. Authentication with kjobs/apiary service
+    2. Training job submission via their API
+    3. Job status monitoring
+    4. Log retrieval
+    5. Job cancellation
+    """
+
+    def __init__(self, api_endpoint: str, api_key: str) -> None:
+        """Initialize kjobs/apiary training client.
+
+        Args:
+            api_endpoint: kjobs/apiary API endpoint URL
+            api_key: Authentication key
+
+        Raises:
+            NotImplementedError: API not yet available
+        """
+        self.api_endpoint = api_endpoint
+        self.api_key = api_key
+        logger.warning(
+            "KjobsTrainingExecutor is a placeholder - kjobs/apiary training API not yet available. "
+            "Use RayTrainingExecutor for Ray clusters."
+        )
+
+    def submit_training_job(self, config: Any) -> str:
+        """Submit training job to kjobs/apiary.
+
+        Args:
+            config: Training configuration
+
+        Raises:
+            NotImplementedError: API not yet available
+        """
+        raise NotImplementedError(
+            "kjobs/apiary training API not yet available. "
+            "Use RayTrainingExecutor for Ray clusters."
+        )
+
+    def get_training_job_status(self, job_id: str) -> JobInfo:
+        """Get training job status from kjobs/apiary.
+
+        Args:
+            job_id: Job ID
+
+        Raises:
+            NotImplementedError: API not yet available
+        """
+        raise NotImplementedError(
+            "kjobs/apiary training API not yet available. "
+            "Use RayTrainingExecutor for Ray clusters."
+        )
+
+    def cancel_training_job(self, job_id: str) -> bool:
+        """Cancel training job in kjobs/apiary.
+
+        Args:
+            job_id: Job ID
+
+        Raises:
+            NotImplementedError: API not yet available
+        """
+        raise NotImplementedError(
+            "kjobs/apiary training API not yet available. "
+            "Use RayTrainingExecutor for Ray clusters."
+        )
+
+    def get_training_job_logs(self, job_id: str) -> str:
+        """Get training job logs from kjobs/apiary.
+
+        Args:
+            job_id: Job ID
+
+        Raises:
+            NotImplementedError: API not yet available
+        """
+        raise NotImplementedError(
+            "kjobs/apiary training API not yet available. "
+            "Use RayTrainingExecutor for Ray clusters."
+        )
