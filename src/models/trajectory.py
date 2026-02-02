@@ -1,6 +1,6 @@
 """Trajectory logging models."""
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -24,3 +24,7 @@ class TrajectoryEntry(BaseModel):
     input: dict[str, Any]
     output: dict[str, Any]
     metadata: dict[str, Any]
+    # RL training fields (backward compatible)
+    reward: Optional[float] = None
+    terminal: bool = False
+    success: Optional[bool] = None
