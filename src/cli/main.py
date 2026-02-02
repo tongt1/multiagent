@@ -229,6 +229,47 @@ Examples:
         help="Enable debug logging",
     )
 
+    # ========== EXPORT-MARTI SUBCOMMAND (trajectory export) ==========
+    export_marti_parser = subparsers.add_parser(
+        "export-marti",
+        help="Export trajectories to MARTI-compatible format",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Export trajectory to MARTI format
+  python -m src.cli.main export-marti --input trajectories/run_001.jsonl --output marti_trajectories.jsonl
+
+  # Export with custom number of solvers
+  python -m src.cli.main export-marti --input trajectories/run_001.jsonl --output marti_trajectories.jsonl --num-solvers 5
+        """,
+    )
+
+    export_marti_parser.add_argument(
+        "--input",
+        required=True,
+        help="Path to input trajectory JSONL file",
+    )
+
+    export_marti_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path to output MARTI JSONL file",
+    )
+
+    export_marti_parser.add_argument(
+        "--num-solvers",
+        type=int,
+        default=3,
+        help="Number of solver agents (default: 3)",
+    )
+
+    export_marti_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
 
     # Show help if no subcommand provided
@@ -322,6 +363,29 @@ async def async_main() -> int:
                 poll_interval=args.poll_interval,
                 console=console,
             )
+
+        elif args.command == "export-marti":
+            # MARTI trajectory export
+            from pathlib import Path
+            from src.data.training_export import export_to_marti_jsonl
+            from src.training.marti_exporter import build_agent_graph
+
+            logger.info(f"Exporting trajectories from: {args.input}")
+            logger.info(f"Output to: {args.output}")
+            logger.info(f"Number of solvers: {args.num_solvers}")
+
+            # Build agent graph
+            agent_graph = build_agent_graph(num_solvers=args.num_solvers)
+
+            # Export trajectories
+            num_exported = export_to_marti_jsonl(
+                trajectory_path=Path(args.input),
+                output_path=Path(args.output),
+                agent_graph=agent_graph,
+            )
+
+            console.print(f"[green]✓[/green] Exported {num_exported} trajectories to MARTI format")
+            console.print(f"Output file: {args.output}")
 
         return 0
 
