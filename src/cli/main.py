@@ -270,6 +270,156 @@ Examples:
         help="Enable debug logging",
     )
 
+    # ========== TRAIN SUBCOMMAND (training job submission) ==========
+    train_parser = subparsers.add_parser(
+        "train",
+        help="Submit multi-agent RL training job to Ray cluster",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Submit training job
+  python -m src.cli.main train trajectories/marti_train.jsonl \\
+    --pretrain-path models/cohere-7b \\
+    --save-path checkpoints/run_001
+
+  # With custom algorithm and reward shaping
+  python -m src.cli.main train trajectories/marti_train.jsonl \\
+    --pretrain-path models/cohere-7b \\
+    --save-path checkpoints/run_001 \\
+    --algorithm ppo \\
+    --reward-mode quality \\
+    --alpha 0.7
+
+  # Wait for completion
+  python -m src.cli.main train trajectories/marti_train.jsonl \\
+    --pretrain-path models/cohere-7b \\
+    --save-path checkpoints/run_001 \\
+    --wait
+        """,
+    )
+
+    train_parser.add_argument(
+        "trajectory_path",
+        help="Path to MARTI trajectory JSONL file",
+    )
+
+    train_parser.add_argument(
+        "--pretrain-path",
+        required=True,
+        help="Base model checkpoint path",
+    )
+
+    train_parser.add_argument(
+        "--save-path",
+        required=True,
+        help="Output checkpoint directory",
+    )
+
+    train_parser.add_argument(
+        "--ray-address",
+        default="http://localhost:8265",
+        help="Ray cluster dashboard address (default: http://localhost:8265)",
+    )
+
+    train_parser.add_argument(
+        "--algorithm",
+        default="reinforce",
+        choices=["ppo", "grpo", "reinforce", "rloo"],
+        help="Training algorithm (default: reinforce)",
+    )
+
+    train_parser.add_argument(
+        "--reward-mode",
+        default="margin",
+        choices=["quality", "margin", "none"],
+        help="Reward shaping mode (default: margin)",
+    )
+
+    train_parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.5,
+        help="Reward shaping alpha parameter (default: 0.5)",
+    )
+
+    train_parser.add_argument(
+        "--num-episodes",
+        type=int,
+        default=5,
+        help="Number of training episodes (default: 5)",
+    )
+
+    train_parser.add_argument(
+        "--num-gpus-per-node",
+        type=int,
+        default=2,
+        help="GPUs per node (default: 2)",
+    )
+
+    train_parser.add_argument(
+        "--num-nodes",
+        type=int,
+        default=3,
+        help="Number of nodes (default: 3)",
+    )
+
+    train_parser.add_argument(
+        "--wandb-project",
+        help="Weights & Biases project name (optional)",
+    )
+
+    train_parser.add_argument(
+        "--wait",
+        action="store_true",
+        help="Wait for job completion",
+    )
+
+    train_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
+    # ========== TRAIN-STATUS SUBCOMMAND (training job status) ==========
+    train_status_parser = subparsers.add_parser(
+        "train-status",
+        help="Check training job status and view logs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Check job status once
+  python -m src.cli.main train-status marti-train-20260201-123456
+
+  # Follow logs until completion
+  python -m src.cli.main train-status marti-train-20260201-123456 --follow
+        """,
+    )
+
+    train_status_parser.add_argument(
+        "job_id",
+        help="Training job ID",
+    )
+
+    train_status_parser.add_argument(
+        "--ray-address",
+        default="http://localhost:8265",
+        help="Ray cluster dashboard address (default: http://localhost:8265)",
+    )
+
+    train_status_parser.add_argument(
+        "--follow",
+        action="store_true",
+        help="Follow logs until completion",
+    )
+
+    train_status_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
 
     # Show help if no subcommand provided
@@ -386,6 +536,160 @@ async def async_main() -> int:
 
             console.print(f"[green]✓[/green] Exported {num_exported} trajectories to MARTI format")
             console.print(f"Output file: {args.output}")
+
+        elif args.command == "train":
+            # Training job submission
+            from pathlib import Path
+            from src.infrastructure.ray_training_executor import submit_training_job
+            from src.training.training_config import (
+                build_default_config,
+                RewardShapingConfig,
+                RewardShapingMode,
+                TrainingAlgorithm,
+            )
+
+            logger.info(f"Submitting training job")
+            logger.info(f"Trajectory: {args.trajectory_path}")
+            logger.info(f"Pretrain: {args.pretrain_path}")
+            logger.info(f"Save path: {args.save_path}")
+            logger.info(f"Ray address: {args.ray_address}")
+
+            # Check trajectory file exists
+            trajectory_path = Path(args.trajectory_path)
+            if not trajectory_path.exists():
+                console.print(f"[red]Error:[/red] Trajectory file not found: {args.trajectory_path}")
+                return 1
+
+            # Build training config
+            config = build_default_config(
+                pretrain_path=args.pretrain_path,
+                trajectory_path=args.trajectory_path,
+                save_path=args.save_path,
+            )
+
+            # Override with CLI parameters
+            config.ray_config.num_nodes = args.num_nodes
+            config.ray_config.num_gpus_per_node = args.num_gpus_per_node
+            config.openrlhf_config.algorithm = TrainingAlgorithm(args.algorithm)
+            config.openrlhf_config.num_episodes = args.num_episodes
+            config.reward_shaping = RewardShapingConfig(
+                mode=RewardShapingMode(args.reward_mode),
+                alpha=args.alpha,
+            )
+            if args.wandb_project:
+                config.wandb_project = args.wandb_project
+
+            # Validate config
+            from src.training.training_config import validate_config
+            errors = validate_config(config)
+            if errors:
+                console.print(f"[red]Configuration Error:[/red]")
+                for error in errors:
+                    console.print(f"  - {error}")
+                return 1
+
+            # Submit job
+            try:
+                job_id = submit_training_job(config, ray_address=args.ray_address)
+
+                console.print(f"[green]✓[/green] Training job submitted: [bold]{job_id}[/bold]")
+                console.print(f"Ray dashboard: {args.ray_address}")
+                console.print(f"\nCheck status with: python -m src.cli.main train-status {job_id}")
+
+                # Wait for completion if requested
+                if args.wait:
+                    console.print("\n[yellow]Waiting for job completion...[/yellow]")
+                    from src.infrastructure.ray_training_executor import (
+                        RayTrainingExecutor,
+                    )
+
+                    executor = RayTrainingExecutor(args.ray_address)
+
+                    import time
+                    while True:
+                        job_info = executor.get_training_job_status(job_id)
+
+                        if job_info.status.value == "succeeded":
+                            console.print(f"[green]✓[/green] Training job succeeded!")
+                            break
+                        elif job_info.status.value == "failed":
+                            console.print(f"[red]✗[/red] Training job failed: {job_info.message}")
+                            return 1
+                        else:
+                            console.print(f"Status: {job_info.status.value}")
+                            time.sleep(10)
+
+            except ImportError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                console.print("Install with: pip install 'ray[client]'")
+                return 1
+            except Exception as e:
+                console.print(f"[red]Training Error:[/red] {e}")
+                logger.exception("Training job submission failed")
+                return 1
+
+        elif args.command == "train-status":
+            # Training job status
+            from src.infrastructure.ray_training_executor import RayTrainingExecutor
+            from rich.table import Table
+
+            logger.info(f"Checking training job status: {args.job_id}")
+
+            try:
+                executor = RayTrainingExecutor(args.ray_address)
+                job_info = executor.get_training_job_status(args.job_id)
+
+                # Display job info table
+                table = Table(title=f"Training Job: {args.job_id}")
+                table.add_column("Field", style="cyan")
+                table.add_column("Value", style="white")
+
+                table.add_row("Job Name", job_info.job_name)
+                table.add_row("Status", job_info.status.value)
+                if job_info.created_at:
+                    table.add_row("Created", job_info.created_at)
+                if job_info.completed_at:
+                    table.add_row("Completed", job_info.completed_at)
+                if job_info.message:
+                    table.add_row("Message", job_info.message)
+
+                console.print(table)
+
+                # Follow logs if requested
+                if args.follow:
+                    console.print("\n[yellow]Following logs...[/yellow]\n")
+
+                    import time
+                    last_logs = ""
+
+                    while True:
+                        job_info = executor.get_training_job_status(args.job_id)
+                        logs = executor.get_training_job_logs(args.job_id)
+
+                        # Print new logs
+                        if logs != last_logs:
+                            new_content = logs[len(last_logs):]
+                            console.print(new_content, end="")
+                            last_logs = logs
+
+                        # Check if job completed
+                        if job_info.status.value in ("succeeded", "failed"):
+                            if job_info.status.value == "succeeded":
+                                console.print("\n[green]✓[/green] Training job succeeded!")
+                            else:
+                                console.print(f"\n[red]✗[/red] Training job failed: {job_info.message}")
+                            break
+
+                        time.sleep(10)
+
+            except ImportError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                console.print("Install with: pip install 'ray[client]'")
+                return 1
+            except Exception as e:
+                console.print(f"[red]Error:[/red] {e}")
+                logger.exception("Failed to get training job status")
+                return 1
 
         return 0
 
