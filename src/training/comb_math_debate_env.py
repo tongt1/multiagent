@@ -154,17 +154,14 @@ class MathDebateNextSpeakerSelector(interface.NextSpeakerSelector):
         debate_round = state.extra.get('debate_round', 0)
         phase = state.extra.get('phase', 'solve')
 
-        # Debate pattern: solve -> verify -> solve -> verify -> ... -> final
+        # Debate pattern: solve -> verify -> final
         # Count chatbot turns to determine when to end
         chatbot_turn_count = sum(1 for t in turns if getattr(t, 'role', data_model.Role.user) == data_model.Role.chatbot)
 
-        # We need: num_debate_rounds * 2 + 1 chatbot turns
-        # (num_debate_rounds solver-verifier pairs + 1 final answer)
-        max_chatbot_turns = debate_round + 2  # Will be incremented in conversation setup
-
-        # For simplicity: allow up to 2 * num_debate_rounds + 1 chatbot turns
-        # This gives: initial solve, verify, solve, verify, ..., final answer
-        if chatbot_turn_count >= (2 + 1):  # Initial + final (minimal debate)
+        # Minimal debate: 2 chatbot turns (initial solve + verification/final)
+        # Extended debate: more rounds add solve-verify pairs
+        # For simplicity, terminate after 2+ chatbot turns (minimal debate achieved)
+        if chatbot_turn_count >= 2:
             # End conversation after sufficient turns
             return interface.NextSpeakerSelectorOutput(
                 next_speaker_id=None,
