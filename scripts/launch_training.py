@@ -329,6 +329,16 @@ def main():
         action="store_true",
         help="Convert data + show SWEEP config preview (no submission)",
     )
+    parser.add_argument(
+        "--skip-eval",
+        action="store_true",
+        help="Skip automatic post-training evaluation",
+    )
+    parser.add_argument(
+        "--eval-data",
+        type=str,
+        help="Path to MATH 500 eval data for post-training evaluation (default: data/math500_cache.json)",
+    )
 
     # Data paths
     parser.add_argument(
@@ -461,7 +471,39 @@ def main():
                 preview=(args.preview or not args.submit),
             )
 
-    print("\n=== Pipeline complete ===")
+        print("\n=== Training submission complete ===")
+
+    # Post-training evaluation (automatic unless --skip-eval)
+    if not args.convert_only and not args.skip_eval:
+        print("\n=== Running automatic post-training evaluation ===")
+        try:
+            # Import evaluate_checkpoints as module
+            from scripts.evaluate_checkpoints import run_evaluation
+
+            experiments_dir = Path(__file__).parent.parent / "experiments"
+            experiment_dir = str(experiments_dir / args.experiment_id)
+
+            eval_result = run_evaluation(
+                experiment_dir=experiment_dir,
+                mode=args.mode,
+                eval_data=args.eval_data,
+                skip_wandb=False,
+            )
+
+            if eval_result["status"] == "complete":
+                print("\n=== Post-training evaluation complete ===")
+            else:
+                print(f"\nWarning: Post-training evaluation had issues: {eval_result.get('error', 'unknown')}")
+        except ImportError as e:
+            print(f"\nWarning: Could not import evaluate_checkpoints for automatic eval: {e}")
+            print(f"Run evaluation manually: python scripts/evaluate_checkpoints.py --experiment-dir experiments/{args.experiment_id}")
+        except Exception as e:
+            print(f"\nWarning: Post-training evaluation failed: {e}")
+            print(f"Run evaluation manually: python scripts/evaluate_checkpoints.py --experiment-dir experiments/{args.experiment_id}")
+    elif args.skip_eval:
+        print("\nSkipping automatic post-training evaluation (--skip-eval)")
+
+    print("\n=== Pipeline complete (training + evaluation) ===")
     print(f"Experiment ID: {args.experiment_id}")
 
 
