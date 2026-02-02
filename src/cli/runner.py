@@ -291,9 +291,18 @@ def display_batch_result(result: BatchResult, console: Console) -> None:
         f"[bold]Failed:[/bold] [red]{result.failed}[/red]",
         f"[bold]Success Rate:[/bold] {success_rate:.1f}%",
         f"[bold]Average Score:[/bold] {avg_score:.3f}",
+    ]
+
+    # Add ground truth reward if any results have it
+    gt_results = [r for r in result.results if r.ground_truth_reward is not None]
+    if gt_results:
+        avg_gt = sum(r.ground_truth_reward for r in gt_results) / len(gt_results)
+        summary_lines.append(f"[bold]Avg GT Reward:[/bold] {avg_gt:.3f} ({len(gt_results)} verified)")
+
+    summary_lines.extend([
         f"[bold]Total Cost:[/bold] ${total_cost:.6f}",
         f"[bold]Elapsed Time:[/bold] {result.elapsed_seconds:.2f}s",
-    ]
+    ])
 
     console.print(Panel("\n".join(summary_lines), title="Batch Execution Summary", expand=False))
 
@@ -328,6 +337,18 @@ def display_batch_result(result: BatchResult, console: Console) -> None:
         )
 
         console.print(dist_table)
+
+    # Verification statistics
+    verification_results = [r for r in result.results if r.ground_truth_reward is not None]
+    if verification_results:
+        avg_verification_reward = sum(r.ground_truth_reward for r in verification_results) / len(verification_results)
+        verification_pass_count = sum(1 for r in verification_results if r.ground_truth_reward >= 0.95)
+        verification_pass_rate = verification_pass_count / len(verification_results)
+
+        console.print(f"\n[bold cyan]Verification Statistics:[/bold cyan]")
+        console.print(f"  Problems with ground truth: {len(verification_results)}/{len(result.results)}")
+        console.print(f"  Verification pass rate: {verification_pass_rate:.1%} ({verification_pass_count}/{len(verification_results)})")
+        console.print(f"  Average verification reward: {avg_verification_reward:.3f}")
 
     # Errors summary if any
     if result.errors:
