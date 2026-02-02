@@ -2,17 +2,25 @@
 
 ## Current Position
 
-**Phase:** 1 of 3 (Core Inference Loop)
-**Plan:** 2 of 3 in current phase
-**Status:** In progress - Plan 01-02 completed
-**Last activity:** 2026-02-02 - Completed 01-02-PLAN.md
+**Phase:** 2 of 3 (Scale and Verify)
+**Plan:** 1 of 6 in current phase
+**Status:** In progress - Plan 02-01 completed
+**Last activity:** 2026-02-01 - Completed 02-01-PLAN.md
 
-**Progress:** 67% of Phase 1
+**Progress:** Overall 4/8 plans complete (50%)
 ```
-Phase 1: [████████████████░░░░░░░░] 67% (2/3 plans)
+Phase 1: [████████████████████████] 100% (3/3 plans) ✓
   ├─ 01-01: Project Foundation ✓
   ├─ 01-02: Agent Implementations ✓
-  └─ 01-03: Orchestrator
+  └─ 01-03: Orchestrator ✓
+
+Phase 2: [████░░░░░░░░░░░░░░░░░░░░] 17% (1/6 plans)
+  ├─ 02-01: Batch Execution Infrastructure ✓
+  ├─ 02-02: Benchmark Evaluation
+  ├─ 02-03: Distributed Execution
+  ├─ 02-04: Model Performance Analysis
+  ├─ 02-05: Trajectory Analysis
+  └─ 02-06: Integration Testing
 ```
 
 ## Accumulated Decisions
@@ -27,6 +35,10 @@ Phase 1: [████████████████░░░░░░░�
 | D6 | Type assertions for Pydantic response models | 01-02 | Type safety | Mypy cannot infer specific response_model return type |
 | D7 | Circular critique detection requires 3+ iterations | 01-02 | Iteration control | Avoid false positives from legitimate similar feedback |
 | D8 | Judge always runs even if verification failed | 01-02 | Benchmarking | Need quality scores for all runs for comparison |
+| D9 | Use asyncio.gather with return_exceptions=True for batch | 02-01 | Batch execution | Enables partial results when some problems fail (vs TaskGroup) |
+| D10 | Fresh pipeline instance per problem in batch | 02-01 | State isolation | Avoids shared CostTracker/TrajectoryLogger state issues |
+| D11 | Dataset streaming with limit for memory efficiency | 02-01 | Resource management | Load subset of MATH/HumanEval without full dataset in memory |
+| D12 | Progress callback pattern for real-time updates | 02-01 | UX | Rich progress bar updates incrementally during batch execution |
 
 ## Blockers/Concerns
 
@@ -37,18 +49,18 @@ Phase 1: [████████████████░░░░░░░�
 
 ## Brief Alignment Status
 
-**On track.** Plan 01-02 completed successfully with full agent and pipeline implementation:
-- Solver, Verifier, Judge agents with structured Pydantic outputs
-- Pipeline orchestrator with iteration control and circular critique detection
-- Comprehensive error handling (agent failures don't crash pipeline)
-- Per-agent cost tracking and trajectory logging
-- 19/19 tests passing (12 foundation + 7 pipeline, all with mocked LLM calls)
-- Code quality: ruff and mypy pass with zero errors
+**On track.** Phase 1 complete. Plan 02-01 completed successfully with batch execution infrastructure:
+- BatchPipelineExecutor with semaphore-controlled concurrent execution
+- DatasetLoader supporting MATH, HumanEval, and local YAML/JSON datasets
+- CLI batch subcommand with Rich progress tracking
+- Fresh pipeline per problem to avoid shared state issues
+- 13/13 new tests passing (Problem model, dataset loading, batch execution, concurrency)
+- All code quality checks pass (ruff, mypy)
 
-**Next:** Plan 01-03 will implement CLI, config loading, and problem runner.
+**Next:** Plan 02-02 will implement benchmark evaluation infrastructure for MATH/HumanEval scoring.
 
 ## Session Continuity
 
-**Last session:** 2026-02-02 03:55 UTC
-**Stopped at:** Completed 01-02-PLAN.md
+**Last session:** 2026-02-01 08:37 UTC
+**Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None
