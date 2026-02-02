@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import yaml
 from datasets import load_dataset
@@ -15,12 +15,12 @@ class Problem(BaseModel):
 
     id: str
     problem: str
-    ground_truth: str | None = None
+    ground_truth: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     domain: Literal["math", "code", "general"] = "general"
 
 
-def load_math_dataset(split: str = "test", limit: int | None = None) -> list[Problem]:
+def load_math_dataset(split: str = "test", limit: Optional[int] = None) -> list[Problem]:
     """Load MATH dataset from HuggingFace.
 
     Args:
@@ -60,7 +60,7 @@ def load_math_dataset(split: str = "test", limit: int | None = None) -> list[Pro
     return problems
 
 
-def load_humaneval_dataset(limit: int | None = None) -> list[Problem]:
+def load_humaneval_dataset(limit: Optional[int] = None) -> list[Problem]:
     """Load HumanEval dataset from HuggingFace.
 
     Args:
