@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "multiagent"
+version = "0.1.0"
+description = "Multi-agent inference pipeline with solver, verifier, and judge agents"
+authors = ["Terry Tong <terry@example.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+litellm = "^1.81.6"
+pydantic = "^2.12.5"
+cohere = "^5.20.2"
+instructor = "^1.14.5"
+tenacity = "^9.0"
+loguru = "^0.7"
+rich = "^14.1.0"
+python-dotenv = "^1.0"
+pydantic-settings = "^2.0"
+pyyaml = "^6.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.5"
+mypy = "^1.13"
+pytest = "^8.2"
+pytest-asyncio = "^0.25"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
