@@ -1,5 +1,8 @@
 # kjobs config for MARTI training
 # Usage: kjobs submit -f kjobs-compute.yaml
+#
+# Before submitting, set WANDB_API_KEY in the command section or
+# ensure the container image has W&B configured.
 worker:
   cpu: 8
   memory: 64Gi
@@ -10,11 +13,15 @@ worker:
     set -e
     echo "=== MARTI Training Job ==="
 
+    # W&B setup (set your API key)
+    export WANDB_BASE_URL=https://cohere.wandb.io
+    # export WANDB_API_KEY=<your-key>
+
     # Install minimal deps not in post_training image
-    pip install wandb loguru pydantic pydantic-settings
+    pip install wandb loguru pydantic pydantic-settings python-dotenv 2>&1 | tail -5
 
     # Clone the repo
-    git clone https://github.com/tongt1/multiagent.git /workspace/multiagent
+    git clone https://github.com/tongt1/multiagent.git /workspace/multiagent 2>&1 | tail -3
     cd /workspace/multiagent
 
     # Run training with CLI args
