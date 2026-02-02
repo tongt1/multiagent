@@ -1,0 +1,71 @@
+# Batch execution configuration for distributed inference
+# This configuration defines dataset source, execution parameters, and distributed job settings
+
+# Dataset configuration
+dataset:
+  # Source can be:
+  # - "math" for MATH dataset via HuggingFace
+  # - "humaneval" for HumanEval dataset
+  # - Path to local YAML/JSON file with problem list
+  source: "math"
+
+  # Limit number of problems (null = all)
+  limit: 100
+
+  # Optional: Filter by domain/difficulty
+  # filters:
+  #   domain: "algebra"
+  #   difficulty: "medium"
+
+# Execution configuration
+execution:
+  # Maximum concurrent problem executions per job
+  concurrency: 10
+
+  # Timeout per problem (seconds)
+  problem_timeout: 300
+
+# Distributed job configuration
+distributed:
+  # Executor type: "kubernetes" or "kjobs"
+  executor: "kubernetes"
+
+  # Job configuration
+  job:
+    # Job name prefix (timestamp will be appended)
+    name: "multiagent-batch"
+
+    # Container image with multiagent package installed
+    # Build with: docker build -t multiagent:latest .
+    image: "multiagent:latest"
+
+    # Kubernetes namespace
+    namespace: "default"
+
+    # Resource requests and limits
+    resources:
+      cpu_request: "2"
+      cpu_limit: "4"
+      memory_request: "8Gi"
+      memory_limit: "16Gi"
+
+    # Number of retries on failure
+    backoff_limit: 3
+
+    # Environment variables (e.g., API keys)
+    # NOTE: For production, use Kubernetes Secrets instead
+    env_vars:
+      # COHERE_API_KEY: "your-key-here"
+      # OPENAI_API_KEY: "your-key-here"
+
+# Pipeline configuration reference
+# This should point to an existing pipeline.yaml with agent configs
+pipeline_config: "config/pipeline.yaml"
+
+# Output configuration
+output:
+  # Directory for trajectory outputs
+  trajectory_dir: "/tmp/trajectories"
+
+  # Save results to persistent storage
+  # results_path: "s3://bucket/results.jsonl"
