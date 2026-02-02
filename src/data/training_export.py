@@ -6,6 +6,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from src.models.trajectory import TrajectoryEntry
+
 
 class TrainingTurn(BaseModel):
     """A single turn in a training trajectory."""
@@ -252,3 +254,77 @@ def export_batch_trajectories(
             f.write(traj.model_dump_json() + "\n")
 
     return len(all_trajectories)
+
+
+def export_to_marti_jsonl(
+    trajectory_path: Path,
+    output_path: Path,
+    agent_graph: dict,
+) -> int:
+    """Export trajectory file to MARTI-compatible JSONL format.
+
+    Args:
+        trajectory_path: Path to input trajectory JSONL file
+        output_path: Path to output MARTI JSONL file
+        agent_graph: Agent graph from build_agent_graph()
+
+    Returns:
+        Number of trajectories exported
+    """
+    from src.training.marti_exporter import (
+        add_graph_metadata,
+        export_to_marti_format,
+    )
+
+    # Load entries as dicts
+    entry_dicts = load_trajectory_entries(trajectory_path)
+
+    if not entry_dicts:
+        return 0
+
+    # Convert dicts to TrajectoryEntry objects
+    entries = []
+    for entry_dict in entry_dicts:
+        try:
+            entry = TrajectoryEntry(**entry_dict)
+            entries.append(entry)
+        except Exception:
+            # Skip malformed entries
+            continue
+
+    # Add graph metadata to each entry
+    entries_with_metadata = [add_graph_metadata(entry, agent_graph) for entry in entries]
+
+    # Group by run_id
+    groups = {}
+    for entry in entries_with_metadata:
+        run_id = entry.run_id
+        if run_id not in groups:
+            groups[run_id] = []
+        groups[run_id].append(entry)
+
+    # Convert each group to MARTI trajectory
+    marti_trajectories = []
+
+    for run_id, trajectory_entries in groups.items():
+        # Extract problem and label from first entry
+        first_entry = trajectory_entries[0]
+        problem = first_entry.input.get("problem", first_entry.input.get("text", ""))
+        label = first_entry.metadata.get("ground_truth", "")
+
+        # Convert to MARTI format
+        marti_traj = export_to_marti_format(
+            entries=trajectory_entries,
+            problem=problem,
+            label=label,
+        )
+        marti_trajectories.append(marti_traj)
+
+    # Write to output file
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        for traj in marti_trajectories:
+            f.write(traj.model_dump_json() + "\n")
+
+    return len(marti_trajectories)
