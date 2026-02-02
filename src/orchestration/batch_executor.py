@@ -2,7 +2,8 @@
 
 import asyncio
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -94,7 +95,10 @@ class BatchPipelineExecutor:
         start_time = time.monotonic()
         total = len(problems)
 
-        logger.info(f"Starting batch execution: {total} problems, max_concurrent={self.max_concurrent}")
+        logger.info(
+            f"Starting batch execution: {total} problems, "
+            f"max_concurrent={self.max_concurrent}"
+        )
 
         # Create tasks for all problems
         tasks = [self.run_one(problem) for problem in problems]
