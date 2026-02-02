@@ -1,0 +1,36 @@
+# kjobs config for MARTI training
+# Usage: kjobs submit -f kjobs-compute.yaml
+worker:
+  cpu: 8
+  memory: 64Gi
+  gpu: 1
+  image:
+    repository: iad.ocir.io/ax8fanrz7l8n/post_training
+  command: |
+    set -e
+    echo "=== MARTI Training Job ==="
+
+    # Install minimal deps not in post_training image
+    pip install wandb loguru pydantic pydantic-settings
+
+    # Clone the repo
+    git clone https://github.com/tongt1/multiagent.git /workspace/multiagent
+    cd /workspace/multiagent
+
+    # Run training with CLI args
+    python -m src.training.train_marti \
+      --pretrain-path HuggingFaceTB/SmolLM-135M \
+      --trajectory-path data/sample_trajectories.jsonl \
+      --save-path /workspace/checkpoints/marti_run_001 \
+      --wandb-project marti-training \
+      --wandb-run-name "marti-smolm-135m-reinforce" \
+      --algorithm reinforce \
+      --num-episodes 3 \
+      --batch-size 8 \
+      --learning-rate 1e-5
+
+    echo "=== Training Complete ==="
+  count: 1
+
+app: marti-training
+type: dynamic
