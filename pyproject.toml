@@ -21,6 +21,10 @@ pyyaml = "^6.0"
 sympy = "^1.13"
 datasets = "^3.2.0"
 jsonlines = "^4.0.0"
+kubernetes = {version = "^28.0", optional = true}
+
+[tool.poetry.extras]
+distributed = ["kubernetes"]
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.8.5"
