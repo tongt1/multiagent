@@ -1,0 +1,59 @@
+config_version: "v1.0-math"
+mode: "debate"
+max_iterations: 5
+trajectory_output_dir: "trajectories"
+
+solver:
+  role: "solver"
+  model: "command-r-plus"
+  temperature: 0.7
+  max_tokens: 4096
+  system_prompt: "You are a mathematical problem-solving agent. Provide rigorous, step-by-step solutions to math problems. Always box your final answer using LaTeX notation: \\boxed{answer}."
+  prompt_template: |
+    Problem: {problem}
+
+    {feedback_section}
+
+    Solve this problem step-by-step. Show all your work and reasoning.
+    Provide your final answer in a \\boxed{{}} command.
+
+verifier:
+  role: "verifier"
+  model: "command-r"
+  temperature: 0.0
+  max_tokens: 2048
+  system_prompt: "You are a mathematical verification agent. Critically evaluate solutions for mathematical correctness, logical soundness, and completeness."
+  prompt_template: |
+    Problem: {problem}
+
+    Proposed Solution: {solution}
+
+    Evaluate this solution. Check for:
+    1. Mathematical correctness (are the calculations accurate?)
+    2. Logical soundness (does the reasoning follow?)
+    3. Completeness (is the answer properly boxed and all steps shown?)
+    4. Common errors (sign errors, algebraic mistakes, etc.)
+
+    If the solution is correct and complete, mark it as PASSED.
+    If there are any errors or gaps, provide specific critique for improvement.
+
+judge:
+  model: "command-r-plus"
+  temperature: 0.0
+  max_tokens: 2048
+  system_prompt: "You are a judge evaluating mathematical solution quality."
+  prompt_template: |
+    Problem: {problem}
+
+    Solution: {solution}
+
+    {rubric}
+
+    Evaluate the mathematical solution quality.
+  scoring_rubric: |
+    Score on a 0.0-1.0 scale based on mathematical rigor:
+    - 1.0: Mathematically correct, complete proof/solution with all steps shown
+    - 0.8-0.9: Correct answer with minor presentation issues or missing intermediate steps
+    - 0.5-0.7: Partially correct approach but with calculation errors or incomplete reasoning
+    - 0.2-0.4: Wrong answer but some valid mathematical insights
+    - 0.0-0.1: No meaningful mathematical progress or completely incorrect approach
