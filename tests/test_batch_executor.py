@@ -366,3 +366,133 @@ class TestBatchResultAggregation:
         )
 
         assert result.total == result.succeeded + result.failed
+
+
+class TestRewardIntegration:
+    """Tests for ground truth reward integration in batch executor."""
+
+    @pytest.fixture
+    def mock_config(self) -> PipelineConfig:
+        """Create a mock pipeline configuration."""
+        return MagicMock(spec=PipelineConfig)
+
+    def create_mock_result(self, problem_id: str, score: float = 0.8) -> PipelineResult:
+        """Create a mock PipelineResult."""
+        return PipelineResult(
+            problem_description=f"Problem {problem_id}",
+            solution=f"The answer is \\boxed{{4}}",
+            passed_verification=True,
+            judge_score=score,
+            iterations=2,
+            total_cost=0.001,
+            trajectory_path=f"/tmp/traj_{problem_id}.jsonl",
+            token_usage=TokenUsage(
+                prompt_tokens=100, completion_tokens=50, total_tokens=150
+            ),
+            cost_summary={},
+        )
+
+    @pytest.mark.asyncio
+    async def test_batch_executor_computes_math_rewards(self, mock_config: PipelineConfig) -> None:
+        """Test that batch executor computes math rewards when ground truth available."""
+        problem = Problem(
+            id="math_001",
+            problem="What is 2+2?",
+            domain="math",
+            ground_truth="\\boxed{4}",
+            metadata={}
+        )
+
+        executor = BatchPipelineExecutor(mock_config, max_concurrent=1)
+
+        with patch(
+            "src.orchestration.batch_executor.SolverVerifierJudgePipeline"
+        ) as mock_pipeline_class:
+            mock_pipeline = AsyncMock()
+            mock_pipeline.run = AsyncMock(return_value=self.create_mock_result("math_001"))
+            mock_pipeline_class.return_value = mock_pipeline
+
+            result = await executor.run_one(problem)
+
+            assert result.ground_truth_reward is not None
+            assert isinstance(result.ground_truth_reward, float)
+
+    @pytest.mark.asyncio
+    async def test_batch_executor_skips_reward_when_no_ground_truth(self, mock_config: PipelineConfig) -> None:
+        """Test that batch executor skips reward computation when no ground truth."""
+        problem = Problem(
+            id="general_001",
+            problem="Explain quantum computing",
+            domain="general",
+            ground_truth=None,
+            metadata={}
+        )
+
+        executor = BatchPipelineExecutor(mock_config, max_concurrent=1)
+
+        with patch(
+            "src.orchestration.batch_executor.SolverVerifierJudgePipeline"
+        ) as mock_pipeline_class:
+            mock_pipeline = AsyncMock()
+            mock_pipeline.run = AsyncMock(return_value=self.create_mock_result("general_001"))
+            mock_pipeline_class.return_value = mock_pipeline
+
+            result = await executor.run_one(problem)
+            assert result.ground_truth_reward is None
+
+    @pytest.mark.asyncio
+    async def test_batch_executor_handles_reward_error_gracefully(self, mock_config: PipelineConfig) -> None:
+        """Test that batch executor handles reward computation errors gracefully."""
+        problem = Problem(
+            id="math_002",
+            problem="Complex math problem",
+            domain="math",
+            ground_truth="\\boxed{42}",
+            metadata={}
+        )
+
+        # Patch RewardCalculator BEFORE creating executor (since it's instantiated in __init__)
+        with patch(
+            "src.orchestration.batch_executor.RewardCalculator"
+        ) as mock_calc_class, patch(
+            "src.orchestration.batch_executor.SolverVerifierJudgePipeline"
+        ) as mock_pipeline_class:
+            # Setup mock calculator to raise error
+            mock_calc = MagicMock()
+            mock_calc.compute_reward.side_effect = RuntimeError("Sympy crash")
+            mock_calc_class.return_value = mock_calc
+
+            # Setup mock pipeline
+            mock_pipeline = AsyncMock()
+            mock_pipeline.run = AsyncMock(return_value=self.create_mock_result("math_002"))
+            mock_pipeline_class.return_value = mock_pipeline
+
+            # Create executor AFTER patching (so it gets the mock)
+            executor = BatchPipelineExecutor(mock_config, max_concurrent=1)
+
+            result = await executor.run_one(problem)
+
+            # Should still return a result, just with None reward
+            assert isinstance(result, PipelineResult)
+            assert result.ground_truth_reward is None
+            assert result.ground_truth_details is not None
+            assert "error" in result.ground_truth_details
+
+    @pytest.mark.asyncio
+    async def test_pipeline_result_has_ground_truth_fields(self) -> None:
+        """Test that PipelineResult model has ground_truth_reward field."""
+        result = PipelineResult(
+            problem_description="Test",
+            solution="Solution",
+            passed_verification=True,
+            judge_score=0.8,
+            iterations=1,
+            total_cost=0.0,
+            trajectory_path="/tmp/test.jsonl",
+            token_usage=TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            cost_summary={},
+            ground_truth_reward=0.95,
+            ground_truth_details={"domain": "math", "is_correct": True},
+        )
+        assert result.ground_truth_reward == 0.95
+        assert result.ground_truth_details["is_correct"] is True
