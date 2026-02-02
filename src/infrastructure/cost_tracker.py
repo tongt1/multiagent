@@ -1,6 +1,6 @@
 """Cost tracker for LLM API usage."""
 
-from typing import Any
+from typing import Any, Optional
 
 from src.models.trajectory import TokenUsage
 
@@ -16,7 +16,7 @@ class CostTracker:
         "command-r-08-2024": (0.0005, 0.0015),
     }
 
-    def __init__(self, custom_rates: dict[str, tuple[float, float]] | None = None) -> None:
+    def __init__(self, custom_rates: Optional[dict[str, tuple[float, float]]] = None) -> None:
         """Initialize cost tracker.
 
         Args:
@@ -33,7 +33,7 @@ class CostTracker:
         self.cost_by_agent: dict[str, float] = {}
 
     def add_usage(
-        self, model: str, usage: TokenUsage, agent: str | None = None
+        self, model: str, usage: TokenUsage, agent: Optional[str] = None
     ) -> float:
         """Add token usage and calculate cost.
 
