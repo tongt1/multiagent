@@ -24,6 +24,9 @@ try:
     from comb.registry import register_builder
     from comb.shared import speakers as shared_speakers
 
+    # Import ground truth verification for dual reward logging
+    from src.evaluation.math_verifier import verify_math_answer
+
     COMB_AVAILABLE = True
 except ImportError:
     # Comb not installed - provide minimal stubs for local testing
@@ -230,8 +233,23 @@ class MathDebateScenario(interface.Scenario):
             return interface.RewardOutput(
                 reward=0.0,
                 text_info={"error": "Comb not available"},
-                metrics={"correctness_score": 0.0},
+                metrics={
+                    "correctness_score": 0.0,
+                    "ground_truth_reward": 0.0,
+                    "reward_agreement": 0.0,
+                    "format_score": 0.0,
+                    "validator_call_time": 0.0,
+                },
             )
+
+        # Default metrics structure for all error returns
+        default_metrics = {
+            "correctness_score": 0.0,
+            "ground_truth_reward": 0.0,
+            "reward_agreement": 0.0,
+            "format_score": 0.0,
+            "validator_call_time": 0.0,
+        }
 
         # Find last chatbot turn
         chatbot_turns = [t for t in turns if t.role == data_model.Role.chatbot]
@@ -239,7 +257,7 @@ class MathDebateScenario(interface.Scenario):
             return interface.RewardOutput(
                 reward=0.0,
                 text_info={"error": "No chatbot turns found"},
-                metrics={"correctness_score": 0.0},
+                metrics=default_metrics,
             )
 
         last_chatbot_turn = chatbot_turns[-1]
@@ -249,7 +267,7 @@ class MathDebateScenario(interface.Scenario):
             return interface.RewardOutput(
                 reward=0.0,
                 text_info={"error": "Empty chatbot turn"},
-                metrics={"correctness_score": 0.0},
+                metrics=default_metrics,
             )
 
         # Ensure last content is TextContent
@@ -257,7 +275,7 @@ class MathDebateScenario(interface.Scenario):
             return interface.RewardOutput(
                 reward=0.0,
                 text_info={"error": "Last content not TextContent"},
-                metrics={"correctness_score": 0.0},
+                metrics=default_metrics,
             )
 
         # Extract parameters
@@ -306,9 +324,23 @@ class MathDebateScenario(interface.Scenario):
             conv_setup.scenario_config.use_format_reward
         )
 
+        # Compute ground truth binary reward for dual reward logging
+        ground_truth_reward = 0.0
+        if COMB_AVAILABLE:
+            # Use symbolic equivalence verification
+            gt_is_correct = verify_math_answer(extracted_answer, str(gold_answer))
+            ground_truth_reward = 1.0 if gt_is_correct else 0.0
+
+        # Compute reward agreement: 1 if BEE and GT agree, 0 otherwise
+        # Cast BEE truth_value to binary (>= 0.5 -> 1.0, else 0.0)
+        bee_binary = 1.0 if correctness_score >= 0.5 else 0.0
+        reward_agreement = 1.0 if bee_binary == ground_truth_reward else 0.0
+
         # Build output
         metrics: dict[str, float | None] = {
             "correctness_score": correctness_score,
+            "ground_truth_reward": ground_truth_reward,
+            "reward_agreement": reward_agreement,
             "format_score": format_score,
             "validator_call_time": validator_call_time,
         }
