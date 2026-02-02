@@ -6,25 +6,29 @@
 worker:
   cpu: 8
   memory: 64Gi
-  gpu: 1
+  gpu: 0
   image:
-    repository: iad.ocir.io/ax8fanrz7l8n/post_training
+    repository: pytorch/pytorch
+    tag: 2.5.1-cuda12.4-cudnn9-runtime
   command: |
-    set -e
+    set -ex
     echo "=== MARTI Training Job ==="
+
+    # Install system deps (git not in pytorch base image)
+    apt-get update && apt-get install -y git 2>&1 | tail -5
 
     # W&B setup (set your API key)
     export WANDB_BASE_URL=https://cohere.wandb.io
     # export WANDB_API_KEY=<your-key>
 
-    # Install minimal deps not in post_training image
-    pip install wandb loguru pydantic pydantic-settings python-dotenv 2>&1 | tail -5
+    # Install Python deps
+    pip install wandb loguru pydantic pydantic-settings python-dotenv transformers accelerate datasets 2>&1 | tail -10
 
     # Clone the repo
     git clone https://github.com/tongt1/multiagent.git /workspace/multiagent 2>&1 | tail -3
     cd /workspace/multiagent
 
-    # Run training with CLI args
+    # Run training with CLI args (CPU-only)
     python -m src.training.train_marti \
       --pretrain-path HuggingFaceTB/SmolLM-135M \
       --trajectory-path data/sample_trajectories.jsonl \
@@ -39,5 +43,7 @@ worker:
     echo "=== Training Complete ==="
   count: 1
 
+namespace: default
+queue: cpu-queue
 app: marti-training
 type: dynamic
