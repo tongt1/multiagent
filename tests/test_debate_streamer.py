@@ -229,3 +229,55 @@ def test_debate_streamer_with_multiple_roles():
     assert result_metrics[METRIC_REWARD_SOLVER] == pytest.approx(0.75)
     assert result_metrics[METRIC_REWARD_VERIFIER] == pytest.approx(0.4)
     assert result_metrics[METRIC_REWARD_JUDGE] == pytest.approx(0.5)
+
+
+def test_rollout_table_called_at_interval():
+    """Test that rollout table logging is called at configured intervals."""
+    from unittest.mock import patch
+
+    items = [
+        MockActorOutputItem(reward=0.5, role_label="solver"),
+        MockActorOutputItem(reward=1.0, role_label="solver"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=2,
+        log_rollout_table_every_n_gets=5  # Log every 5 get() calls
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    with patch("src.training.wandb_enrichment.rollout_integration.log_debate_rollout_table") as mock_log:
+        # Call get() 12 times
+        for _ in range(12):
+            streamer.get()
+
+        # Should have been called at get() #5 and get() #10 (2 times total)
+        assert mock_log.call_count == 2
+
+        # Verify calls were at step 5 and 10
+        call_steps = [call.kwargs["step"] for call in mock_log.call_args_list]
+        assert call_steps == [5, 10]
+
+
+def test_workspace_init_called_on_first_get():
+    """Test that workspace initialization is called on first get() call."""
+    from unittest.mock import patch
+
+    items = [MockActorOutputItem(reward=0.5, role_label="solver")]
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(n_rollouts_per_prompt=1)
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace") as mock_init:
+        # First get() should trigger workspace init
+        streamer.get()
+        assert mock_init.call_count == 1
+
+        # Second get() should NOT trigger workspace init again
+        streamer.get()
+        assert mock_init.call_count == 1

@@ -75,9 +75,12 @@ class DebateMetricStreamerConfig(_base_config_class, **_component_kwargs):
     Attributes:
         n_rollouts_per_prompt: GRPO group size (number of rollouts per prompt).
             Must match generations_per_prompt in SWEEP config.
+        log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
+            Roughly corresponds to log_train_generations_every_steps in Flink.
     """
 
     n_rollouts_per_prompt: int = 8  # GRPO group size
+    log_rollout_table_every_n_gets: int = 25  # Log W&B table every N get() calls
 
     def create_streamer(self, upstream, config, metrics_collector):
         """Create a DebateMetricStreamer instance.
@@ -123,14 +126,26 @@ class DebateMetricStreamer(_base_streamer_class):
         self._config = config
         self._upstream = upstream
         self._metrics_collector = metrics_collector
+        self._get_count = 0  # Track get() calls for rollout table logging
 
     def get(self):
         """Fetch items from upstream and enrich with debate metrics.
+
+        Also handles rollout table logging and workspace initialization.
 
         Returns:
             Tuple of (items, metrics) where metrics includes debate-specific scalars.
         """
         items, upstream_metrics = self._upstream.get()
+        self._get_count += 1
+
+        # Initialize W&B workspace on first get() call
+        if self._get_count == 1:
+            try:
+                from src.training.wandb_enrichment.workspace_init import init_debate_workspace
+                init_debate_workspace()
+            except Exception as e:
+                logger.warning(f"DebateMetricStreamer: workspace init failed: {e}")
 
         try:
             # Extract rewards from items
@@ -165,6 +180,15 @@ class DebateMetricStreamer(_base_streamer_class):
 
             # Merge: upstream metrics take precedence on conflict (unlikely)
             all_metrics = {**debate_metrics, **upstream_metrics}
+
+            # Log rollout table at configured intervals
+            if self._get_count % self._config.log_rollout_table_every_n_gets == 0:
+                try:
+                    from src.training.wandb_enrichment.rollout_integration import log_debate_rollout_table
+                    log_debate_rollout_table(items=items, step=self._get_count)
+                except Exception as e:
+                    logger.warning(f"DebateMetricStreamer: rollout table logging failed: {e}")
+
             return items, all_metrics
 
         except Exception as e:
