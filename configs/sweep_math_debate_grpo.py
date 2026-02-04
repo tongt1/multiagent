@@ -35,6 +35,9 @@ from post_training.flink.components.flink_learning_filter.filtering_streamer imp
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 
+# Debate-specific enrichment (Phase 5)
+from src.training.wandb_enrichment.debate_streamer import DebateMetricStreamerConfig
+
 # vLLM sidecar configuration
 _VLLM_SIDECAR = "vllm"
 _VLLM_PORT = 8000
@@ -187,7 +190,12 @@ class MathDebateGRPO(sweep_base.Sweep):
                                 FilterOnTruncatedConfig(filter_mode=FilterMode.ONLY),
                             ],
                         )
-                    )
+                    ),
+                    # Phase 5: Debate metric enrichment
+                    # Computes per-role rewards and zero-advantage detection metrics
+                    DebateMetricStreamerConfig(
+                        n_rollouts_per_prompt=GENERATIONS_PER_PROMPT,
+                    ),
                 ],
                 eval=FlinkEvalConfig(
                     n_generation_steps=-1,
