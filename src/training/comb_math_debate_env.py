@@ -239,6 +239,7 @@ class MathDebateScenario(interface.Scenario):
                     "reward_agreement": 0.0,
                     "format_score": 0.0,
                     "validator_call_time": 0.0,
+                    "role_label": "solver",  # Will be enriched in Phase 6 with actual role assignment
                 },
             )
 
@@ -249,6 +250,7 @@ class MathDebateScenario(interface.Scenario):
             "reward_agreement": 0.0,
             "format_score": 0.0,
             "validator_call_time": 0.0,
+            "role_label": "solver",  # Will be enriched in Phase 6 with actual role assignment
         }
 
         # Find last chatbot turn
@@ -343,6 +345,7 @@ class MathDebateScenario(interface.Scenario):
             "reward_agreement": reward_agreement,
             "format_score": format_score,
             "validator_call_time": validator_call_time,
+            "role_label": "solver",  # Will be enriched in Phase 6 with actual role assignment
         }
         text_info: dict[str, str] = {
             "correct_answer": str(gold_answer),
