@@ -41,30 +41,31 @@ _VLLM_PORT = 8000
 _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
 # Shared training hyperparameters (MUST be identical between debate and baseline)
-NUM_TRAINING_GPUS = 64  # Must be power of 2
-NUM_SAMPLING_GPUS = 64  # Must be divisible by 8
-TRAIN_BATCH_SIZE = 64
-EVAL_BATCH_SIZE = 32
-TOTAL_TRAIN_STEPS = 500
+# Using 7B model for faster iteration - switch to 8x15B for production runs
+NUM_TRAINING_GPUS = 8  # Must be power of 2 (7B can run on 8 GPUs)
+NUM_SAMPLING_GPUS = 8  # Must be divisible by 8 (7B needs 1 GPU per worker)
+TRAIN_BATCH_SIZE = 32
+EVAL_BATCH_SIZE = 16
+TOTAL_TRAIN_STEPS = 200  # Reduced for testing
 MAX_SEQUENCE_LENGTH = 8192
-LEARNING_RATE = 1.5e-6
-KL_BETA = 0.01
+LEARNING_RATE = 3e-6  # Standard for 7B GRPO
+KL_BETA = 0.03
 GENERATIONS_PER_PROMPT = 8
 EXPORT_EVERY_STEPS = 5
-HARD_UPDATE_REF_EVERY_STEPS = 5
+HARD_UPDATE_REF_EVERY_STEPS = 5  # Must match EXPORT_EVERY_STEPS
 SEED = 42
 
 # Model and infrastructure settings
-MODEL_TO_QUERY = "command-a-03-2025-pld-rl"
-IS_STAGING = False
+MODEL_TO_QUERY = "command-a-03-2025"  # Staging model (no -pld-rl suffix)
+IS_STAGING = True  # Use staging API for Hive/Blobheart (requires CO_API_KEY_STAGING)
 K8S_SECRETS_PATH = "${HOME}/repos/secrets_template.toml"
 
-# TODO: Set to your base model checkpoint path
-CKPT_PATH = "s3://us-east-01a/foundations-experiments/viraat_cohere_com/MM/8x15B/merges_posttrain/add_only_vit/26A91T_7bua4gxj_vit_ckpt7999_59rfb4uy_llm_ckpt6405/ckpt-0/"
+# 7B checkpoint for testing - switch to 8x15B for production
+# Using named checkpoint alias (resolved by sweep infrastructure)
+CKPT_PATH = "c3_7B_12-2024_command_release"
 
-# TODO: Set to your converted debate training data path
-DEBATE_DATA_PATH = "gs://your-bucket/multiagent-debate-rl/debate/train.jsonl"
-DEBATE_EVAL_PATH = "gs://your-bucket/multiagent-debate-rl/debate/eval.jsonl"
+# NOTE: Using default data from run_config (AIME 2024/2025 validation sets)
+# For production, set custom data paths and uncomment data_dir_dict override below
 
 
 class MathDebateGRPO(sweep_base.Sweep):
@@ -74,15 +75,23 @@ class MathDebateGRPO(sweep_base.Sweep):
     )
     fax: sweep.FaxConfig = sweep_base.PostTraining(
         partition=f"gpu_{NUM_TRAINING_GPUS}",
-        queue=sweep.Queue.post_training_prod_run_queue,
+        queue=sweep.Queue.post_training_cohere_labs_queue,
         jobs_max_fanout=1,
         wandb_project="multiagent-debate-rl",
         priority_class="dev-high",
-        run_config="post_training/command4/training_group/rlvr/2025_oct_10/8x15_math_data.run",
-        k8s_env_secrets_toml=K8S_SECRETS_PATH,
+        run_config="${HOME}/repos/post_training/post_training/experimental/comb_flink/configs/rloo_7B_math.run",
+        k8s_env_secrets_toml=K8S_SECRETS_PATH,  # Contains CO_API_KEY_STAGING (unlimited key)
         ckpt_path=CKPT_PATH,
+        output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/debate/${SWEEP_NAME}/${TRIAL_IDX}",
         patch_run_config=dict(
-            output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/debate/${SWEEP_NAME}/${TRIAL_IDX}",
+            # v1.1 Phase 5: Enable gradient norm logging for debate training monitoring
+            # Logs train/grad_norm and train/update_norm to W&B (maps to debate/grad/global_norm in dashboard)
+            advanced_logging=dict(
+                enabled=True,
+                norm_granularity=["global"],  # Global gradient norm only (minimal overhead)
+                norm_target_trees=["grad", "update"],  # Log both gradient and param update norms
+                log_histograms=False,  # Disable histograms to reduce W&B overhead
+            ),
             train_batch_size=TRAIN_BATCH_SIZE,
             eval_batch_size=EVAL_BATCH_SIZE,
             total_train_steps=TOTAL_TRAIN_STEPS,
@@ -110,8 +119,7 @@ class MathDebateGRPO(sweep_base.Sweep):
                     },
                 },
             },
-            data_dir_dict={DEBATE_DATA_PATH: 1},
-            eval_data_dir_dict={DEBATE_EVAL_PATH: 1},
+            # Using default data from run_config
             n_last_ckpts_to_keep=2,
             checkpoint_every_steps=50,
             minizord=flink_zord.FlinkZordConfig(
@@ -142,7 +150,7 @@ class MathDebateGRPO(sweep_base.Sweep):
                 ),
                 input_data_preprocessor=CombItemsPreprocessorConfig(
                     patch_data_item={
-                        "math_debate": dict(
+                        "math": dict(
                             agent_trajectory=dict(
                                 preamble=dict(
                                     react_config=dict(
@@ -154,7 +162,7 @@ class MathDebateGRPO(sweep_base.Sweep):
                         )
                     },
                     patch_scenario_config={
-                        "math_debate": dict(
+                        "math": dict(
                             hive_estimator_config={
                                 "model": MODEL_TO_QUERY,
                                 "prod": not IS_STAGING,
@@ -193,7 +201,7 @@ class MathDebateGRPO(sweep_base.Sweep):
             ).model_dump(),
             likelihood_evals=None,
             ckpt=dict(force_at_init=True),
-            validation=dict(force_at_init=True),
+            validation=dict(force_at_init=False),  # Skip initial eval to avoid rate limiting
             model_export=dict(enabled=False),
             profile_every_steps=5,
             first_step_to_profile=1,
@@ -212,7 +220,7 @@ class MathDebateGRPO(sweep_base.Sweep):
                         "python -m vinfer.main",
                         f"--exports-glob-pattern={_VLLM_EXPORT_DIR}/*/_HF_EXPORT_IS_COMPLETE",
                         f"--port {_VLLM_PORT}",
-                        "--gpus-per-vllm-worker=8",
+                        "--gpus-per-vllm-worker=1",  # 7B model fits on 1 GPU
                     ]
                 ),
                 ports=dict(web=_VLLM_PORT),
