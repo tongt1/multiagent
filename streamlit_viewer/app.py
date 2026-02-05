@@ -16,6 +16,8 @@ from streamlit_viewer.config import (
 )
 from streamlit_viewer.lib.data_loader import auto_detect_source, discover_parquet_files
 from streamlit_viewer.pages.step_browser import render_step_browser
+from streamlit_viewer.pages.overview import render_overview
+from streamlit_viewer.pages.comparison import render_comparison
 
 
 # ============================================================================
@@ -188,32 +190,14 @@ st.markdown("---")
 # Create tabs for different views
 tabs = st.tabs(["📊 Overview", "🔬 Step Browser", "⚖️ Comparison"])
 
-# Tab 1: Overview (placeholder for Plan 07-03)
+# Tab 1: Overview
 with tabs[0]:
-    st.info("📊 **Overview tab coming in Plan 07-03**")
-    st.markdown("This tab will show:")
-    st.markdown("- Training progress timeline")
-    st.markdown("- Per-role reward trends")
-    st.markdown("- Zero-advantage detection metrics")
-
-    # Display current data source config for verification
-    st.markdown("---")
-    st.subheader("Current Data Source Configuration")
-    if source_mode == "Auto-detect":
-        st.json({"mode": "Auto-detect", "parquet_dir": parquet_dir, "wandb_entity": wandb_entity})
-    elif source_mode == "Local Parquet":
-        st.json({"mode": "Local Parquet", "directory": parquet_dir})
-    else:
-        st.json({"mode": "W&B Tables", "entity": wandb_entity, "project": wandb_project, "run_id": wandb_run_id or "all"})
+    render_overview(st.session_state.run_configs)
 
 # Tab 2: Step Browser
 with tabs[1]:
     render_step_browser(st.session_state.run_configs)
 
-# Tab 3: Comparison (placeholder for Plan 07-03)
+# Tab 3: Comparison
 with tabs[2]:
-    st.info("⚖️ **Comparison tab coming in Plan 07-03**")
-    st.markdown("This tab will show:")
-    st.markdown("- Side-by-side debate timeline visualization")
-    st.markdown("- Per-turn reward breakdown")
-    st.markdown("- Text diff for solver/verifier/judge turns")
+    render_comparison(st.session_state.run_configs)
