@@ -15,6 +15,7 @@ from streamlit_viewer.config import (
     WANDB_PROJECT,
 )
 from streamlit_viewer.lib.data_loader import auto_detect_source, discover_parquet_files
+from streamlit_viewer.pages.step_browser import render_step_browser
 
 
 # ============================================================================
@@ -205,13 +206,9 @@ with tabs[0]:
     else:
         st.json({"mode": "W&B Tables", "entity": wandb_entity, "project": wandb_project, "run_id": wandb_run_id or "all"})
 
-# Tab 2: Step Browser (placeholder for Plan 07-02)
+# Tab 2: Step Browser
 with tabs[1]:
-    st.info("🔬 **Step Browser tab coming in Plan 07-02**")
-    st.markdown("This tab will show:")
-    st.markdown("- Step selector with training metrics")
-    st.markdown("- Prompt list sorted by reward variance")
-    st.markdown("- Rollout comparison table (top-k vs bottom-k)")
+    render_step_browser(st.session_state.run_configs)
 
 # Tab 3: Comparison (placeholder for Plan 07-03)
 with tabs[2]:
