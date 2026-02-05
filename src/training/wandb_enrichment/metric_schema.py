@@ -59,6 +59,46 @@ METRIC_KL_JUDGE = f"{DEBATE_PREFIX}kl/judge"
 """Mean KL divergence from reference policy for judge role."""
 
 # ============================================================================
+# Per-Role Loss Metrics
+# ============================================================================
+
+METRIC_LOSS_SOLVER = f"{DEBATE_PREFIX}loss/solver"
+"""Mean per-token loss for solver role."""
+
+METRIC_LOSS_VERIFIER = f"{DEBATE_PREFIX}loss/verifier"
+"""Mean per-token loss for verifier role."""
+
+METRIC_LOSS_JUDGE = f"{DEBATE_PREFIX}loss/judge"
+"""Mean per-token loss for judge role."""
+
+METRIC_LOSS_FRAC_SOLVER = f"{DEBATE_PREFIX}loss_frac/solver"
+"""Fraction of total loss from solver role (sum of fractions = 1.0)."""
+
+METRIC_LOSS_FRAC_VERIFIER = f"{DEBATE_PREFIX}loss_frac/verifier"
+"""Fraction of total loss from verifier role (sum of fractions = 1.0)."""
+
+METRIC_LOSS_FRAC_JUDGE = f"{DEBATE_PREFIX}loss_frac/judge"
+"""Fraction of total loss from judge role (sum of fractions = 1.0)."""
+
+METRIC_TOKENS_SOLVER = f"{DEBATE_PREFIX}tokens/solver"
+"""Number of solver tokens in the batch."""
+
+METRIC_TOKENS_VERIFIER = f"{DEBATE_PREFIX}tokens/verifier"
+"""Number of verifier tokens in the batch."""
+
+METRIC_TOKENS_JUDGE = f"{DEBATE_PREFIX}tokens/judge"
+"""Number of judge tokens in the batch."""
+
+METRIC_ADVANTAGE_SOLVER = f"{DEBATE_PREFIX}advantage/solver"
+"""Mean advantage value for solver tokens."""
+
+METRIC_ADVANTAGE_VERIFIER = f"{DEBATE_PREFIX}advantage/verifier"
+"""Mean advantage value for verifier tokens."""
+
+METRIC_ADVANTAGE_JUDGE = f"{DEBATE_PREFIX}advantage/judge"
+"""Mean advantage value for judge tokens."""
+
+# ============================================================================
 # Gradient Metrics
 # ============================================================================
 
@@ -179,6 +219,20 @@ ALL_DEBATE_METRICS = [
     METRIC_KL_SOLVER,
     METRIC_KL_VERIFIER,
     METRIC_KL_JUDGE,
+
+    # Per-role loss
+    METRIC_LOSS_SOLVER,
+    METRIC_LOSS_VERIFIER,
+    METRIC_LOSS_JUDGE,
+    METRIC_LOSS_FRAC_SOLVER,
+    METRIC_LOSS_FRAC_VERIFIER,
+    METRIC_LOSS_FRAC_JUDGE,
+    METRIC_TOKENS_SOLVER,
+    METRIC_TOKENS_VERIFIER,
+    METRIC_TOKENS_JUDGE,
+    METRIC_ADVANTAGE_SOLVER,
+    METRIC_ADVANTAGE_VERIFIER,
+    METRIC_ADVANTAGE_JUDGE,
 
     # Gradients
     METRIC_GRAD_GLOBAL_NORM,
