@@ -180,8 +180,8 @@ def render_comparison(run_configs: list[dict]) -> None:
             per_turn_rewards = _get_per_turn_rewards(left_rollout)
             turns = attach_per_turn_rewards(turns, per_turn_rewards)
 
-            # Render rollout card
-            render_rollout_card(left_rollout, show_full_text=False)
+            # Render rollout card (convert Series to dict for layout helper)
+            render_rollout_card(left_rollout.to_dict(), turns, expanded=False)
 
             # Render debate timeline
             if turns:
@@ -197,8 +197,8 @@ def render_comparison(run_configs: list[dict]) -> None:
             per_turn_rewards = _get_per_turn_rewards(right_rollout)
             turns = attach_per_turn_rewards(turns, per_turn_rewards)
 
-            # Render rollout card
-            render_rollout_card(right_rollout, show_full_text=False)
+            # Render rollout card (convert Series to dict for layout helper)
+            render_rollout_card(right_rollout.to_dict(), turns, expanded=False)
 
             # Render debate timeline
             if turns:
@@ -310,15 +310,15 @@ def render_comparison(run_configs: list[dict]) -> None:
                 best_idx = prompt_rollouts["reward"].idxmax()
                 best_rollout = prompt_rollouts.loc[best_idx]
 
-                # Display
-                st.metric("Best Reward", f"{best_rollout['reward']:.2f}")
-                render_rollout_card(best_rollout, show_full_text=False)
-
-                # Parse and render timeline
+                # Parse debate turns for this rollout
                 completion = best_rollout.get("trajectory", "")
                 turns = parse_debate_turns(completion)
                 per_turn_rewards = _get_per_turn_rewards(best_rollout)
                 turns = attach_per_turn_rewards(turns, per_turn_rewards)
+
+                # Display
+                st.metric("Best Reward", f"{best_rollout['reward']:.2f}")
+                render_rollout_card(best_rollout.to_dict(), turns, expanded=False)
 
                 if turns:
                     render_debate_timeline(turns, title="Best Rollout Timeline")
