@@ -30,74 +30,29 @@ if TYPE_CHECKING:
     from post_training.flink.components.flink_learning_filter import async_metrics_collector
 
 try:
-    from fax import config as fax_config
     from fax.config import components
-    from post_training import relax
     from post_training.flink import flink_types
-    from post_training.flink.components.flink_learning_filter import async_metrics_collector
 
     FLINK_AVAILABLE = True
 except ImportError:
     FLINK_AVAILABLE = False
-    # Provide stubs for local testing
-    fax_config = None
-    relax = None
     flink_types = None
-    async_metrics_collector = None
 
-    # Minimal stub for components.ComponentBase
-    class ComponentBase:
+    # Minimal stub for components
+    class _ComponentBaseStub:
         def __init__(self, **kwargs):
-            # Accept any kwargs for testing
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
     class components:
-        ComponentBase = ComponentBase
+        ComponentBase = _ComponentBaseStub
 
 logger = logging.getLogger(__name__)
 
 
-if FLINK_AVAILABLE:
-    _base_config_class = flink_types.FlinkActorOutputStreamerConfig
-    _base_streamer_class = flink_types.FlinkActorOutputStreamer
-    _component_kwargs = {"component_name": "debate_metric_streamer"}
-else:
-    # Stubs for local testing
-    _base_config_class = components.ComponentBase
-    _base_streamer_class = object
-    _component_kwargs = {}
-
-
-class DebateMetricStreamerConfig(_base_config_class, **_component_kwargs):
-    """Configuration for DebateMetricStreamer.
-
-    Attributes:
-        n_rollouts_per_prompt: GRPO group size (number of rollouts per prompt).
-            Must match generations_per_prompt in SWEEP config.
-        log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
-            Roughly corresponds to log_train_generations_every_steps in Flink.
-    """
-
-    n_rollouts_per_prompt: int = 8  # GRPO group size
-    log_rollout_table_every_n_gets: int = 25  # Log W&B table every N get() calls
-
-    def create_streamer(self, upstream, config, metrics_collector):
-        """Create a DebateMetricStreamer instance.
-
-        Args:
-            upstream: Upstream FlinkActorOutputStreamer
-            config: Fax config
-            metrics_collector: AsyncMetricsCollector
-
-        Returns:
-            DebateMetricStreamer instance
-        """
-        return DebateMetricStreamer(self, upstream, metrics_collector)
-
-
-class DebateMetricStreamer(_base_streamer_class):
-    """Enriches actor output metrics with debate-specific scalar metrics.
+# Implementation mixin with the actual logic (shared between both class definitions)
+class _DebateMetricStreamerImpl:
+    """Implementation mixin for DebateMetricStreamer.
 
     Wraps an upstream streamer. On each get() call:
     1. Calls upstream.get() to receive items + metrics
@@ -106,13 +61,6 @@ class DebateMetricStreamer(_base_streamer_class):
     4. Merges debate metrics into the returned Metrics dict
 
     The returned metrics flow through flink_batching -> actor_metrics -> learner_metrics -> W&B.
-
-    Metrics flow path:
-        debate_streamer.get() returns (items, {debate/...})
-        -> flink_batching.get_next_batch() weighted avg
-        -> train_step() actor_metrics
-        -> learner_metrics
-        -> W&B plotter
     """
 
     def __init__(self, config, upstream, metrics_collector):
@@ -189,6 +137,18 @@ class DebateMetricStreamer(_base_streamer_class):
                 except Exception as e:
                     logger.warning(f"DebateMetricStreamer: rollout table logging failed: {e}")
 
+            # Write Parquet debug data at configured intervals (for Streamlit viewer)
+            if self._config.debug_data_output_dir and self._get_count % self._config.log_rollout_table_every_n_gets == 0:
+                try:
+                    from src.training.wandb_enrichment.rollout_integration import write_debate_debug_data
+                    write_debate_debug_data(
+                        items=items,
+                        step=self._get_count,
+                        output_dir=self._config.debug_data_output_dir,
+                    )
+                except Exception as e:
+                    logger.warning(f"DebateMetricStreamer: debug data writing failed: {e}")
+
             return items, all_metrics
 
         except Exception as e:
@@ -199,3 +159,58 @@ class DebateMetricStreamer(_base_streamer_class):
     def flush_and_discard_ready_items(self):
         """Flush upstream streamer's ready items."""
         self._upstream.flush_and_discard_ready_items()
+
+
+# Define classes based on Flink availability
+# IMPORTANT: component_name MUST be a literal argument, not dynamic **kwargs,
+# because Ray/cloudpickle doesn't preserve dynamically unpacked class keywords
+if FLINK_AVAILABLE:
+    class DebateMetricStreamerConfig(flink_types.FlinkActorOutputStreamerConfig, component_name="debate_metric_streamer"):
+        """Configuration for DebateMetricStreamer.
+
+        Attributes:
+            n_rollouts_per_prompt: GRPO group size (number of rollouts per prompt).
+                Must match generations_per_prompt in SWEEP config.
+            log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
+                Roughly corresponds to log_train_generations_every_steps in Flink.
+        """
+
+        n_rollouts_per_prompt: int = 8  # GRPO group size
+        log_rollout_table_every_n_gets: int = 25  # Log W&B table every N get() calls
+        debug_data_output_dir: str = ""  # Empty = disabled; set to dir path to write Parquet debug data
+
+        def create_streamer(self, upstream, config, metrics_collector):
+            """Create a DebateMetricStreamer instance."""
+            return DebateMetricStreamer(self, upstream, metrics_collector)
+
+    class DebateMetricStreamer(_DebateMetricStreamerImpl, flink_types.FlinkActorOutputStreamer):
+        """Flink-compatible DebateMetricStreamer."""
+        pass
+
+else:
+    # Stubs for local testing without Flink
+    class DebateMetricStreamerConfig(components.ComponentBase):
+        """Configuration for DebateMetricStreamer (test stub)."""
+
+        n_rollouts_per_prompt: int = 8
+        log_rollout_table_every_n_gets: int = 25
+        debug_data_output_dir: str = ""
+
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            # Set defaults for missing attributes
+            if not hasattr(self, 'n_rollouts_per_prompt'):
+                self.n_rollouts_per_prompt = 8
+            if not hasattr(self, 'log_rollout_table_every_n_gets'):
+                self.log_rollout_table_every_n_gets = 25
+            if not hasattr(self, 'debug_data_output_dir'):
+                self.debug_data_output_dir = ""
+
+        def create_streamer(self, upstream, config, metrics_collector):
+            """Create a DebateMetricStreamer instance."""
+            return DebateMetricStreamer(self, upstream, metrics_collector)
+
+    class DebateMetricStreamer(_DebateMetricStreamerImpl):
+        """Test stub for DebateMetricStreamer."""
+        pass

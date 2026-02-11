@@ -27,12 +27,23 @@ from src.training.wandb_enrichment.metric_schema import (
 class MockActorOutputItem:
     """Mock ActorOutputWithMetadata for testing."""
 
-    def __init__(self, reward: float, role_label: str = "solver", env_name: str = "math_debate"):
+    def __init__(
+        self,
+        reward: float,
+        role_label: str = "solver",
+        env_name: str = "math_debate",
+        trajectory: str | None = None,
+        unique_sample_id: str | None = None,
+    ):
         self.data = {"rewards": np.array(reward)}
         self.metadata = {
             "env_name": np.array(env_name),
             f"{env_name}/reward_metrics": {"role_label": role_label},
         }
+        if trajectory is not None:
+            self.metadata["trajectory"] = np.array(trajectory)
+        if unique_sample_id is not None:
+            self.metadata["unique_sample_id"] = np.array(unique_sample_id)
 
 
 class MockUpstreamStreamer:
@@ -281,3 +292,117 @@ def test_workspace_init_called_on_first_get():
         # Second get() should NOT trigger workspace init again
         streamer.get()
         assert mock_init.call_count == 1
+
+
+def test_debug_data_written_at_interval():
+    """Test that write_debate_debug_data is called at configured intervals when debug_data_output_dir is set."""
+    from unittest.mock import patch
+
+    items = [
+        MockActorOutputItem(
+            reward=0.5, role_label="solver",
+            trajectory="Turn 1 text", unique_sample_id="math:1",
+        ),
+        MockActorOutputItem(
+            reward=1.0, role_label="solver",
+            trajectory="Turn 2 text", unique_sample_id="math:2",
+        ),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=2,
+        log_rollout_table_every_n_gets=3,
+        debug_data_output_dir="/tmp/test_debug",
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace"), \
+         patch("src.training.wandb_enrichment.rollout_integration.log_debate_rollout_table"), \
+         patch("src.training.wandb_enrichment.rollout_integration.write_debate_debug_data") as mock_write:
+        # Call get() 7 times
+        for _ in range(7):
+            streamer.get()
+
+        # Should have been called at get #3 and #6 (2 times total)
+        assert mock_write.call_count == 2
+
+        # Verify call args
+        first_call = mock_write.call_args_list[0]
+        assert first_call.kwargs["items"] == items
+        assert first_call.kwargs["step"] == 3
+        assert first_call.kwargs["output_dir"] == "/tmp/test_debug"
+
+        second_call = mock_write.call_args_list[1]
+        assert second_call.kwargs["step"] == 6
+        assert second_call.kwargs["output_dir"] == "/tmp/test_debug"
+
+
+def test_debug_data_not_written_when_dir_empty():
+    """Test that write_debate_debug_data is NOT called when debug_data_output_dir is empty (default)."""
+    from unittest.mock import patch
+
+    items = [
+        MockActorOutputItem(
+            reward=0.5, role_label="solver",
+            trajectory="Turn 1 text", unique_sample_id="math:1",
+        ),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=1,
+        log_rollout_table_every_n_gets=1,
+        debug_data_output_dir="",  # Empty = disabled (default)
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace"), \
+         patch("src.training.wandb_enrichment.rollout_integration.log_debate_rollout_table"), \
+         patch("src.training.wandb_enrichment.rollout_integration.write_debate_debug_data") as mock_write:
+        # Call get() 5 times
+        for _ in range(5):
+            streamer.get()
+
+        # Should never be called since debug_data_output_dir is empty
+        assert mock_write.call_count == 0
+
+
+def test_debug_data_error_does_not_crash():
+    """Test that errors in write_debate_debug_data do not propagate to caller."""
+    from unittest.mock import patch
+
+    items = [
+        MockActorOutputItem(
+            reward=0.5, role_label="solver",
+            trajectory="Turn 1 text", unique_sample_id="math:1",
+        ),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=1,
+        log_rollout_table_every_n_gets=1,
+        debug_data_output_dir="/tmp/test",
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace"), \
+         patch("src.training.wandb_enrichment.rollout_integration.log_debate_rollout_table"), \
+         patch("src.training.wandb_enrichment.rollout_integration.write_debate_debug_data",
+               side_effect=RuntimeError("disk full")) as mock_write:
+        # Call get() once -- should NOT raise
+        result_items, result_metrics = streamer.get()
+
+        # Should return items and metrics successfully
+        assert result_items == items
+        assert isinstance(result_metrics, dict)
+
+        # Verify the function WAS called (attempted) but error was caught
+        assert mock_write.call_count == 1
