@@ -29,6 +29,8 @@ def discover_parquet_files(directory: str) -> list[dict]:
         List of dicts with {"step": int, "path": str} sorted by step ascending.
         Empty list if directory doesn't exist or no files found.
     """
+    if not directory or not directory.strip():
+        return []
     if not os.path.isdir(directory):
         return []
 
@@ -236,7 +238,10 @@ def auto_detect_source(
             }
 
     # No source found
-    return "none", {"error": "No data source found"}
+    return "none", {
+        "error": "No data source configured",
+        "hint": "Set a Parquet directory path or configure W&B credentials",
+    }
 
 
 def compute_step_summary(df: pd.DataFrame) -> dict:

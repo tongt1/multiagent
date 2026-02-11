@@ -50,7 +50,7 @@ if "run_configs" not in st.session_state:
         {
             "label": "Run 1",
             "source_type": DATA_SOURCE_PARQUET,
-            "path_or_run": ".",
+            "path_or_run": "",
         }
     ]
 
@@ -80,8 +80,8 @@ wandb_run_id = None
 if source_mode in ["Local Parquet", "Auto-detect"]:
     parquet_dir = st.sidebar.text_input(
         "Parquet directory:",
-        value=".",
-        help="Directory containing batch_debug_data_train_*.parquet files",
+        value="",
+        help="Path to directory containing batch_debug_data_train_*.parquet files (e.g., /path/to/debug_data/)",
     )
 
 if source_mode in ["W&B Tables", "Auto-detect"]:
@@ -119,7 +119,10 @@ if source_mode == "Auto-detect":
             f"✓ Detected W&B: {metadata.get('num_runs', 0)} runs in {metadata['project']}"
         )
     else:
-        st.sidebar.warning("⚠ No data source found. Check paths and credentials.")
+        st.sidebar.info(
+            "No data loaded yet. Enter a Parquet directory path above, "
+            "or configure W&B credentials to connect to a remote run."
+        )
 
 
 # ============================================================================
@@ -156,7 +159,7 @@ if num_runs < 4:
         st.session_state.run_configs.append({
             "label": f"Run {num_runs + 1}",
             "source_type": DATA_SOURCE_PARQUET,
-            "path_or_run": ".",
+            "path_or_run": "",
         })
         st.rerun()
 
@@ -186,6 +189,19 @@ st.markdown(
     "Explore training progress, compare rollouts, and analyze per-role contributions."
 )
 st.markdown("---")
+
+# Show guidance when no data is configured
+_any_configured = any(
+    rc.get("path_or_run", "").strip()
+    for rc in st.session_state.run_configs
+)
+if not _any_configured:
+    st.info(
+        "**Getting started:** Configure a data source in the sidebar to begin exploring training rollouts.\n\n"
+        "- **Local Parquet:** Set the directory path where `batch_debug_data_train_*.parquet` files "
+        "are saved during training (set `debug_data_output_dir` in DebateMetricStreamerConfig).\n"
+        "- **W&B Tables:** Enter your W&B entity and project to browse logged rollout tables."
+    )
 
 # Create tabs for different views
 tabs = st.tabs(["📊 Overview", "🔬 Step Browser", "⚖️ Comparison"])
