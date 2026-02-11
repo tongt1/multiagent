@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+import configs._image_reuse  # noqa: F401 — skip Docker builds when REUSE_IMAGE_TAG is set
 import sweep
 
 from post_training.canonicals import sweep_base
@@ -34,6 +35,8 @@ from post_training.flink.components.flink_learning_filter.filter_on_truncated im
 from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
+# GPUStatsStreamer disabled: @ray.remote at module scope + kubectl subprocesses
+# destabilize Ray cluster and add memory pressure. Rewrite before re-enabling.
 
 # vLLM sidecar configuration
 _VLLM_SIDECAR = "vllm"
@@ -42,17 +45,17 @@ _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
 # Shared training hyperparameters (MUST be identical between debate and baseline)
 # Using 7B model for faster iteration - switch to 8x15B for production runs
-NUM_TRAINING_GPUS = 8  # Must be power of 2 (7B can run on 8 GPUs)
-NUM_SAMPLING_GPUS = 8  # Must be divisible by 8 (7B needs 1 GPU per worker)
+NUM_TRAINING_GPUS = 8  # 24 total GPUs: 8 train + 16 vLLM
+NUM_SAMPLING_GPUS = 16  # 7B fits on 1 GPU per vLLM worker (16 workers for throughput)
 TRAIN_BATCH_SIZE = 32
-EVAL_BATCH_SIZE = 16
-TOTAL_TRAIN_STEPS = 200  # Reduced for testing
+EVAL_BATCH_SIZE = 8
+TOTAL_TRAIN_STEPS = 100  # Fast iteration — enough for learning curves
 MAX_SEQUENCE_LENGTH = 8192
 LEARNING_RATE = 3e-6  # Standard for 7B GRPO
 KL_BETA = 0.03
 GENERATIONS_PER_PROMPT = 8
-EXPORT_EVERY_STEPS = 5
-HARD_UPDATE_REF_EVERY_STEPS = 5  # Must match EXPORT_EVERY_STEPS
+EXPORT_EVERY_STEPS = 20  # Was 5 — each export costs ~40s, so 5→20 saves ~600s over 100 steps
+HARD_UPDATE_REF_EVERY_STEPS = 20  # Must match EXPORT_EVERY_STEPS
 SEED = 42
 
 # Model and infrastructure settings
@@ -97,7 +100,7 @@ class MathBaselineGRPO(sweep_base.Sweep):
             total_train_steps=TOTAL_TRAIN_STEPS,
             max_sequence_length=MAX_SEQUENCE_LENGTH,
             validation_every_steps=50,
-            n_gradient_accumulation_steps=4,
+            n_gradient_accumulation_steps=2,  # 32*2=64 effective batch
             lr_schedule={
                 "kwargs": {
                     "peak_lr": LEARNING_RATE,
@@ -166,7 +169,7 @@ class MathBaselineGRPO(sweep_base.Sweep):
                             hive_estimator_config={
                                 "model": MODEL_TO_QUERY,
                                 "prod": not IS_STAGING,
-                                "max_retries": 2,
+                                "max_retries": 10,
                             },
                         ),
                     },
@@ -175,8 +178,8 @@ class MathBaselineGRPO(sweep_base.Sweep):
                     sampler_endpoint_key="sampler_key",
                 ),
                 num_actors_per_batch_item=GENERATIONS_PER_PROMPT,
-                actors_queue_batches=8,
-                eval_actors_queue_batches=4,
+                actors_queue_batches=128,  # Must be >= GENERATIONS_PER_PROMPT * (TRAIN_BATCH_SIZE / grad_accum) = 8*16
+                eval_actors_queue_batches=64,  # Must be >= GENERATIONS_PER_PROMPT * EVAL_BATCH_SIZE = 8*8
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
                     FilteringStreamerConfig(
@@ -187,7 +190,7 @@ class MathBaselineGRPO(sweep_base.Sweep):
                                 FilterOnTruncatedConfig(filter_mode=FilterMode.ONLY),
                             ],
                         )
-                    )
+                    ),
                 ],
                 eval=FlinkEvalConfig(
                     n_generation_steps=-1,
@@ -196,12 +199,22 @@ class MathBaselineGRPO(sweep_base.Sweep):
                         patch_number_of_generation_per_prompt=1,
                     ),
                 ),
-                log_train_generations_every_steps=25,
+                log_train_generations_every_steps=10,  # More frequent for quick feedback
                 save_debug_data_every_steps=1,
             ).model_dump(),
             likelihood_evals=None,
-            ckpt=dict(force_at_init=True),
+            ckpt=dict(force_at_init=False),  # Skip initial ckpt save (~60s)
             validation=dict(force_at_init=False),  # Skip initial eval to avoid rate limiting
+            hf_export=dict(
+                override_mesh_for_local_gathering=True,  # Use dedicated export mesh (tp=8) to avoid SPMD rematerialization
+            ),
+            finetuning=dict(
+                lora=dict(
+                    enabled=True,
+                    rank=8,
+                    alpha=8.0,
+                ),
+            ),
             model_export=dict(enabled=False),
             profile_every_steps=5,
             first_step_to_profile=1,
