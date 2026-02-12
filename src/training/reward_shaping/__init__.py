@@ -6,9 +6,8 @@ nuanced multi-agent credit assignment.
 
 Available strategies:
 - identity: Passthrough (default), preserves existing binary rewards
-- (future) difference_rewards: Counterfactual marginal contribution
-- (future) coma: Counterfactual multi-agent policy gradients
-- (future) potential_based: Potential-based reward shaping
+- difference_rewards: Counterfactual marginal contribution D_i = G(z) - G(z_{-i})
+- reward_mixing: Blends global team reward with per-role local signals
 
 Usage:
     from src.training.reward_shaping import create_strategy_from_config
@@ -29,12 +28,16 @@ from src.training.reward_shaping.registry import (
     register_strategy,
 )
 
-# Import identity to trigger auto-registration
+# Import strategies to trigger auto-registration
 from src.training.reward_shaping.identity import IdentityRewardShaper
+from src.training.reward_shaping.difference_rewards import DifferenceRewardShaper
+from src.training.reward_shaping.reward_mixing import RewardMixingShaper
 
 __all__ = [
     "RewardShaper",
     "IdentityRewardShaper",
+    "DifferenceRewardShaper",
+    "RewardMixingShaper",
     "register_strategy",
     "get_strategy",
     "create_strategy_from_config",
