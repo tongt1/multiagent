@@ -197,7 +197,10 @@ def build_patch_run_config(
 
     # Create a shallow copy to avoid mutating the caller's dict
     result = dict(base_config)
-    result["multi_model"] = {
+    # Store multi_model config under metadata to avoid RunConfig extra_forbidden
+    # validation error. RunConfig.metadata is Dict[str, Any] and accepts arbitrary
+    # keys, whereas top-level RunConfig fields are strictly typed (extra="forbid").
+    result.setdefault("metadata", {})["multi_model"] = {
         "enabled": True,
         "solver_ckpt": config.solver_ckpt,
         "verifier_ckpt": config.verifier_ckpt,
