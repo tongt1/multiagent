@@ -7,6 +7,13 @@ weighted average into actor_metrics -> learner_metrics -> W&B plotter.
 
 The streamer is wired into the training pipeline via SWEEP config's
 actor_outputs_streamers extension point (no Flink core changes).
+
+Reward shaping integration (Phase 8):
+The streamer can optionally apply a reward shaping strategy to transform
+raw binary rewards before logging. Shaped rewards are logged as additional
+debate/shaped_reward/* metrics. The original (unshaped) metrics remain
+unchanged for backward compatibility. Configure via reward_shaping_strategy
+and reward_shaping_params in DebateMetricStreamerConfig.
 """
 
 from __future__ import annotations
@@ -21,6 +28,9 @@ from src.training.wandb_enrichment.debate_metrics import (
     compute_per_role_rewards,
     compute_zero_advantage_metrics,
 )
+
+# Import reward shaping registry (always available)
+from src.training.reward_shaping import create_strategy_from_config
 
 # Conditional imports for Flink infrastructure (not available in local testing)
 if TYPE_CHECKING:
@@ -76,6 +86,19 @@ class _DebateMetricStreamerImpl:
         self._metrics_collector = metrics_collector
         self._get_count = 0  # Track get() calls for rollout table logging
 
+        # Initialize reward shaping strategy from config (Phase 8)
+        reward_shaping_config = None
+        strategy_name = getattr(config, "reward_shaping_strategy", "")
+        if strategy_name:
+            reward_shaping_config = {
+                "strategy_name": strategy_name,
+                "strategy_params": getattr(config, "reward_shaping_params", {}) or {},
+            }
+        self._reward_shaper = create_strategy_from_config(reward_shaping_config)
+        logger.info(
+            f"DebateMetricStreamer: initialized reward shaping strategy '{self._reward_shaper.name}'"
+        )
+
     def get(self):
         """Fetch items from upstream and enrich with debate metrics.
 
@@ -121,10 +144,17 @@ class _DebateMetricStreamerImpl:
                     # Default to "solver" if role_label not found
                     role_labels.append("solver")
 
-            # Compute debate metrics
+            # Compute debate metrics (unshaped, for backward compatibility)
             debate_metrics = {}
             debate_metrics.update(compute_per_role_rewards(rewards, role_labels))
             debate_metrics.update(compute_zero_advantage_metrics(rewards, self._config.n_rollouts_per_prompt))
+
+            # Apply reward shaping and log shaped reward metrics (Phase 8)
+            try:
+                shaped_metrics = self._compute_shaped_reward_metrics(rewards, role_labels)
+                debate_metrics.update(shaped_metrics)
+            except Exception as e:
+                logger.warning(f"DebateMetricStreamer: reward shaping failed: {e}")
 
             # Merge: upstream metrics take precedence on conflict (unlikely)
             all_metrics = {**debate_metrics, **upstream_metrics}
@@ -156,6 +186,62 @@ class _DebateMetricStreamerImpl:
             # Return upstream metrics unchanged on error
             return items, upstream_metrics
 
+    def _compute_shaped_reward_metrics(
+        self,
+        rewards: np.ndarray,
+        role_labels: list[str],
+    ) -> dict[str, float]:
+        """Compute shaped reward metrics using the configured strategy.
+
+        Applies the reward shaping strategy and logs per-role shaped rewards
+        as debate/shaped_reward/* metrics. For identity strategy, shaped rewards
+        equal original rewards.
+
+        Args:
+            rewards: Shape (B,) raw rewards per rollout.
+            role_labels: Role label per rollout.
+
+        Returns:
+            Dict with shaped reward metrics using debate/shaped_reward/ prefix.
+        """
+        # Build role_masks from role_labels for strategies that need them
+        batch_size = len(rewards)
+        role_masks = {}
+        for role in ("solver", "verifier", "judge"):
+            mask = np.array([label == role for label in role_labels], dtype=bool)
+            if mask.any():
+                role_masks[role] = mask
+
+        # Apply reward shaping (trajectory_metadata not available in streamer context)
+        shaped = self._reward_shaper.shape_rewards(rewards, role_masks, None)
+
+        # Convert shaped output to metrics dict
+        metrics = {}
+
+        if isinstance(shaped, dict):
+            # Per-role shaped rewards (e.g., difference_rewards, reward_mixing, coma_advantage)
+            for role, role_rewards in shaped.items():
+                if len(role_rewards) > 0:
+                    metrics[f"debate/shaped_reward/{role}"] = float(role_rewards.mean())
+            # Also log overall mean shaped reward
+            all_shaped = np.concatenate(list(shaped.values()))
+            if len(all_shaped) > 0:
+                metrics["debate/shaped_reward/mean"] = float(all_shaped.mean())
+        else:
+            # Global shaped rewards (e.g., identity, potential_based)
+            metrics["debate/shaped_reward/mean"] = float(shaped.mean())
+            # Break down by role
+            for role in ("solver", "verifier", "judge"):
+                if role in role_masks:
+                    role_shaped = shaped[role_masks[role]]
+                    if len(role_shaped) > 0:
+                        metrics[f"debate/shaped_reward/{role}"] = float(role_shaped.mean())
+
+        # Log which strategy is active
+        metrics["debate/shaped_reward/strategy_active"] = 1.0 if self._reward_shaper.name != "identity" else 0.0
+
+        return metrics
+
     def flush_and_discard_ready_items(self):
         """Flush upstream streamer's ready items."""
         self._upstream.flush_and_discard_ready_items()
@@ -173,11 +259,19 @@ if FLINK_AVAILABLE:
                 Must match generations_per_prompt in SWEEP config.
             log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
                 Roughly corresponds to log_train_generations_every_steps in Flink.
+            reward_shaping_strategy: Name of registered reward shaping strategy.
+                Available: "identity" (default), "difference_rewards", "reward_mixing",
+                "coma_advantage", "potential_based". Empty string uses identity.
+            reward_shaping_params: Strategy-specific parameters passed to the
+                strategy constructor. E.g., {"alpha": 0.7} for reward_mixing,
+                {"n_rollouts_per_prompt": 4} for coma_advantage.
         """
 
         n_rollouts_per_prompt: int = 8  # GRPO group size
         log_rollout_table_every_n_gets: int = 25  # Log W&B table every N get() calls
         debug_data_output_dir: str = ""  # Empty = disabled; set to dir path to write Parquet debug data
+        reward_shaping_strategy: str = ""  # Empty = identity passthrough (default)
+        reward_shaping_params: dict = {}  # Strategy-specific params
 
         def create_streamer(self, upstream, config, metrics_collector):
             """Create a DebateMetricStreamer instance."""
@@ -190,11 +284,23 @@ if FLINK_AVAILABLE:
 else:
     # Stubs for local testing without Flink
     class DebateMetricStreamerConfig(components.ComponentBase):
-        """Configuration for DebateMetricStreamer (test stub)."""
+        """Configuration for DebateMetricStreamer (test stub).
+
+        Attributes:
+            n_rollouts_per_prompt: GRPO group size (number of rollouts per prompt).
+            log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
+            reward_shaping_strategy: Name of registered reward shaping strategy.
+                Available: "identity" (default), "difference_rewards", "reward_mixing",
+                "coma_advantage", "potential_based". Empty string uses identity.
+            reward_shaping_params: Strategy-specific parameters passed to the
+                strategy constructor.
+        """
 
         n_rollouts_per_prompt: int = 8
         log_rollout_table_every_n_gets: int = 25
         debug_data_output_dir: str = ""
+        reward_shaping_strategy: str = ""
+        reward_shaping_params: dict = {}
 
         def __init__(self, **kwargs):
             for key, value in kwargs.items():
@@ -206,6 +312,10 @@ else:
                 self.log_rollout_table_every_n_gets = 25
             if not hasattr(self, 'debug_data_output_dir'):
                 self.debug_data_output_dir = ""
+            if not hasattr(self, 'reward_shaping_strategy'):
+                self.reward_shaping_strategy = ""
+            if not hasattr(self, 'reward_shaping_params'):
+                self.reward_shaping_params = {}
 
         def create_streamer(self, upstream, config, metrics_collector):
             """Create a DebateMetricStreamer instance."""
