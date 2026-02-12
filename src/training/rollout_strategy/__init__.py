@@ -19,16 +19,16 @@ Usage:
 """
 
 from src.training.rollout_strategy.base import RolloutStrategy
+from src.training.rollout_strategy.best_of_n import BestOfNStrategy
+
+# Import strategies to trigger auto-registration
+from src.training.rollout_strategy.identity import IdentityRolloutStrategy
 from src.training.rollout_strategy.registry import (
     create_strategy_from_config,
     get_strategy,
     list_strategies,
     register_strategy,
 )
-
-# Import strategies to trigger auto-registration
-from src.training.rollout_strategy.identity import IdentityRolloutStrategy
-from src.training.rollout_strategy.best_of_n import BestOfNStrategy
 
 __all__ = [
     "RolloutStrategy",
