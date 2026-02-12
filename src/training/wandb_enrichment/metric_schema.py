@@ -106,6 +106,79 @@ METRIC_GRAD_GLOBAL_NORM = f"{DEBATE_PREFIX}grad/global_norm"
 """Global gradient norm (from advanced_logging or manual computation)."""
 
 # ============================================================================
+# Rollout Strategy Metrics
+# ============================================================================
+
+METRIC_ROLLOUT_STRATEGY_ITEMS_IN = f"{DEBATE_PREFIX}rollout_strategy/items_in"
+"""Number of items entering rollout strategy (before selection)."""
+
+METRIC_ROLLOUT_STRATEGY_ITEMS_OUT = f"{DEBATE_PREFIX}rollout_strategy/items_out"
+"""Number of items after rollout strategy selection."""
+
+METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO = f"{DEBATE_PREFIX}rollout_strategy/selection_ratio"
+"""Fraction of items retained by rollout strategy (items_out / items_in)."""
+
+METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD = f"{DEBATE_PREFIX}rollout_strategy/mean_selected_reward"
+"""Mean reward of items after rollout strategy selection/modification."""
+
+# ============================================================================
+# GPU Utilization Metrics (from GPUStatsStreamer)
+# ============================================================================
+
+GPU_PREFIX = "gpu"
+"""All GPU metrics use this prefix."""
+
+# Training GPU aggregates
+METRIC_GPU_TRAIN_AVG_UTIL = f"{GPU_PREFIX}/train/avg_util_pct"
+"""Mean GPU utilization % across all training GPUs."""
+
+METRIC_GPU_TRAIN_MIN_UTIL = f"{GPU_PREFIX}/train/min_util_pct"
+"""Min GPU utilization % across training GPUs (detect stragglers)."""
+
+METRIC_GPU_TRAIN_MAX_UTIL = f"{GPU_PREFIX}/train/max_util_pct"
+"""Max GPU utilization % across training GPUs."""
+
+METRIC_GPU_TRAIN_AVG_MEM = f"{GPU_PREFIX}/train/avg_mem_pct"
+"""Mean GPU memory % across training GPUs."""
+
+METRIC_GPU_TRAIN_MAX_MEM = f"{GPU_PREFIX}/train/max_mem_pct"
+"""Max GPU memory % across training GPUs (OOM risk)."""
+
+METRIC_GPU_TRAIN_TOTAL_MEM_USED = f"{GPU_PREFIX}/train/total_mem_used_gib"
+"""Total GPU memory used across training GPUs (GiB)."""
+
+METRIC_GPU_TRAIN_AVG_TEMP = f"{GPU_PREFIX}/train/avg_temp_c"
+"""Mean GPU temperature (C) across training GPUs."""
+
+METRIC_GPU_TRAIN_MAX_TEMP = f"{GPU_PREFIX}/train/max_temp_c"
+"""Max GPU temperature (C) — thermal throttling risk."""
+
+METRIC_GPU_TRAIN_TOTAL_POWER = f"{GPU_PREFIX}/train/total_power_w"
+"""Total power draw across training GPUs (W)."""
+
+METRIC_GPU_TRAIN_N_GPUS = f"{GPU_PREFIX}/train/n_gpus"
+"""Number of training GPUs detected."""
+
+# vLLM GPU aggregates
+METRIC_GPU_VLLM_AVG_UTIL = f"{GPU_PREFIX}/vllm/avg_util_pct"
+"""Mean GPU utilization % across vLLM sampling GPUs."""
+
+METRIC_GPU_VLLM_AVG_MEM = f"{GPU_PREFIX}/vllm/avg_mem_pct"
+"""Mean GPU memory % across vLLM sampling GPUs."""
+
+METRIC_GPU_VLLM_MAX_MEM = f"{GPU_PREFIX}/vllm/max_mem_pct"
+"""Max GPU memory % across vLLM GPUs."""
+
+METRIC_GPU_VLLM_AVG_TEMP = f"{GPU_PREFIX}/vllm/avg_temp_c"
+"""Mean GPU temperature (C) across vLLM GPUs."""
+
+METRIC_GPU_VLLM_TOTAL_POWER = f"{GPU_PREFIX}/vllm/total_power_w"
+"""Total power draw across vLLM GPUs (W)."""
+
+METRIC_GPU_VLLM_N_GPUS = f"{GPU_PREFIX}/vllm/n_gpus"
+"""Number of vLLM GPUs detected."""
+
+# ============================================================================
 # W&B Table Schema
 # ============================================================================
 
@@ -236,5 +309,11 @@ ALL_DEBATE_METRICS = [
 
     # Gradients
     METRIC_GRAD_GLOBAL_NORM,
+
+    # Rollout strategy
+    METRIC_ROLLOUT_STRATEGY_ITEMS_IN,
+    METRIC_ROLLOUT_STRATEGY_ITEMS_OUT,
+    METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO,
+    METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD,
 ]
 """All debate metric names for validation and documentation."""

@@ -8,6 +8,12 @@ weighted average into actor_metrics -> learner_metrics -> W&B plotter.
 The streamer is wired into the training pipeline via SWEEP config's
 actor_outputs_streamers extension point (no Flink core changes).
 
+Rollout strategy integration (Phase 9):
+The streamer can optionally apply a rollout selection strategy to filter or
+modify rollouts BEFORE reward extraction and shaping. Configure via
+rollout_strategy and rollout_strategy_params in DebateMetricStreamerConfig.
+Execution order: rollout selection -> reward extraction -> reward shaping -> metrics.
+
 Reward shaping integration (Phase 8):
 The streamer can optionally apply a reward shaping strategy to transform
 raw binary rewards before logging. Shaped rewards are logged as additional
@@ -29,8 +35,9 @@ from src.training.wandb_enrichment.debate_metrics import (
     compute_zero_advantage_metrics,
 )
 
-# Import reward shaping registry (always available)
-from src.training.reward_shaping import create_strategy_from_config
+# Import reward shaping and rollout strategy registries (always available)
+from src.training.reward_shaping import create_strategy_from_config as create_reward_strategy
+from src.training.rollout_strategy import create_strategy_from_config as create_rollout_strategy
 
 # Conditional imports for Flink infrastructure (not available in local testing)
 if TYPE_CHECKING:
@@ -94,9 +101,22 @@ class _DebateMetricStreamerImpl:
                 "strategy_name": strategy_name,
                 "strategy_params": getattr(config, "reward_shaping_params", {}) or {},
             }
-        self._reward_shaper = create_strategy_from_config(reward_shaping_config)
+        self._reward_shaper = create_reward_strategy(reward_shaping_config)
         logger.info(
             f"DebateMetricStreamer: initialized reward shaping strategy '{self._reward_shaper.name}'"
+        )
+
+        # Initialize rollout strategy from config (Phase 9)
+        rollout_config = None
+        rollout_strategy_name = getattr(config, "rollout_strategy", "")
+        if rollout_strategy_name:
+            rollout_config = {
+                "strategy_name": rollout_strategy_name,
+                "strategy_params": getattr(config, "rollout_strategy_params", {}) or {},
+            }
+        self._rollout_strategy = create_rollout_strategy(rollout_config)
+        logger.info(
+            f"DebateMetricStreamer: using rollout strategy: {self._rollout_strategy.name}"
         )
 
     def get(self):
@@ -118,8 +138,34 @@ class _DebateMetricStreamerImpl:
             except Exception as e:
                 logger.warning(f"DebateMetricStreamer: workspace init failed: {e}")
 
+        # Apply rollout strategy BEFORE reward extraction (Phase 9)
+        # Execution order: rollout selection -> reward extraction -> reward shaping -> metrics
+        rollout_strategy_metrics = {}
+        items_in = len(items)
         try:
-            # Extract rewards from items
+            items = self._rollout_strategy.select_rollouts(
+                items, self._config.n_rollouts_per_prompt
+            )
+            items_out = len(items)
+            selection_ratio = items_out / items_in if items_in > 0 else 1.0
+
+            # Compute mean selected reward
+            selected_rewards = [item.data["rewards"].item() for item in items]
+            mean_selected_reward = float(np.mean(selected_rewards)) if selected_rewards else 0.0
+
+            rollout_strategy_metrics = {
+                "debate/rollout_strategy/items_in": float(items_in),
+                "debate/rollout_strategy/items_out": float(items_out),
+                "debate/rollout_strategy/selection_ratio": selection_ratio,
+                "debate/rollout_strategy/mean_selected_reward": mean_selected_reward,
+            }
+        except Exception as e:
+            logger.warning(
+                f"DebateMetricStreamer: rollout strategy failed, using original items: {e}"
+            )
+
+        try:
+            # Extract rewards from items (possibly filtered by rollout strategy)
             # items[i].data is a dict with "rewards" key containing numpy scalar
             rewards = np.array([item.data["rewards"].item() for item in items])
 
@@ -147,7 +193,14 @@ class _DebateMetricStreamerImpl:
             # Compute debate metrics (unshaped, for backward compatibility)
             debate_metrics = {}
             debate_metrics.update(compute_per_role_rewards(rewards, role_labels))
-            debate_metrics.update(compute_zero_advantage_metrics(rewards, self._config.n_rollouts_per_prompt))
+
+            # Adjust n_rollouts_per_prompt for zero-advantage computation:
+            # If rollout strategy filtered items (e.g., best-of-N: N*P -> P),
+            # each "group" is now 1 item, so use n_rollouts_per_prompt=1.
+            effective_n_rollouts = self._config.n_rollouts_per_prompt
+            if len(items) < items_in:
+                effective_n_rollouts = 1
+            debate_metrics.update(compute_zero_advantage_metrics(rewards, effective_n_rollouts))
 
             # Apply reward shaping and log shaped reward metrics (Phase 8)
             try:
@@ -156,8 +209,8 @@ class _DebateMetricStreamerImpl:
             except Exception as e:
                 logger.warning(f"DebateMetricStreamer: reward shaping failed: {e}")
 
-            # Merge: upstream metrics take precedence on conflict (unlikely)
-            all_metrics = {**debate_metrics, **upstream_metrics}
+            # Merge: rollout strategy + debate + upstream (upstream takes precedence on conflict)
+            all_metrics = {**rollout_strategy_metrics, **debate_metrics, **upstream_metrics}
 
             # Log rollout table at configured intervals
             if self._get_count % self._config.log_rollout_table_every_n_gets == 0:
@@ -259,6 +312,11 @@ if FLINK_AVAILABLE:
                 Must match generations_per_prompt in SWEEP config.
             log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
                 Roughly corresponds to log_train_generations_every_steps in Flink.
+            rollout_strategy: Name of registered rollout selection strategy.
+                Available: "identity" (default), "best_of_n", "self_consistency".
+                Applied BEFORE reward shaping. Empty string uses identity.
+            rollout_strategy_params: Strategy-specific parameters for rollout selection.
+                E.g., {"agreement_threshold": 0.5} for self_consistency.
             reward_shaping_strategy: Name of registered reward shaping strategy.
                 Available: "identity" (default), "difference_rewards", "reward_mixing",
                 "coma_advantage", "potential_based". Empty string uses identity.
@@ -270,6 +328,8 @@ if FLINK_AVAILABLE:
         n_rollouts_per_prompt: int = 8  # GRPO group size
         log_rollout_table_every_n_gets: int = 25  # Log W&B table every N get() calls
         debug_data_output_dir: str = ""  # Empty = disabled; set to dir path to write Parquet debug data
+        rollout_strategy: str = ""  # Empty = identity passthrough (default)
+        rollout_strategy_params: dict = {}  # Strategy-specific params
         reward_shaping_strategy: str = ""  # Empty = identity passthrough (default)
         reward_shaping_params: dict = {}  # Strategy-specific params
 
@@ -289,6 +349,10 @@ else:
         Attributes:
             n_rollouts_per_prompt: GRPO group size (number of rollouts per prompt).
             log_rollout_table_every_n_gets: Log W&B rollout table every N get() calls.
+            rollout_strategy: Name of registered rollout selection strategy.
+                Available: "identity" (default), "best_of_n", "self_consistency".
+                Applied BEFORE reward shaping. Empty string uses identity.
+            rollout_strategy_params: Strategy-specific parameters for rollout selection.
             reward_shaping_strategy: Name of registered reward shaping strategy.
                 Available: "identity" (default), "difference_rewards", "reward_mixing",
                 "coma_advantage", "potential_based". Empty string uses identity.
@@ -299,6 +363,8 @@ else:
         n_rollouts_per_prompt: int = 8
         log_rollout_table_every_n_gets: int = 25
         debug_data_output_dir: str = ""
+        rollout_strategy: str = ""
+        rollout_strategy_params: dict = {}
         reward_shaping_strategy: str = ""
         reward_shaping_params: dict = {}
 
@@ -312,6 +378,10 @@ else:
                 self.log_rollout_table_every_n_gets = 25
             if not hasattr(self, 'debug_data_output_dir'):
                 self.debug_data_output_dir = ""
+            if not hasattr(self, 'rollout_strategy'):
+                self.rollout_strategy = ""
+            if not hasattr(self, 'rollout_strategy_params'):
+                self.rollout_strategy_params = {}
             if not hasattr(self, 'reward_shaping_strategy'):
                 self.reward_shaping_strategy = ""
             if not hasattr(self, 'reward_shaping_params'):
