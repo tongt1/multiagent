@@ -92,38 +92,76 @@ def _discover_features(task_dir: Path) -> dict[int, FeatureSpec]:
 def _load_subset_filter(dataset_path: Path, subset: str) -> Optional[set[str]]:
     """Load subset filter (lite.json or flash.json).
 
-    Subset files contain a list of task identifiers to include.
+    Supports two filesystem layouts:
+    1. dataset/<subset>.json (flat)
+    2. dataset/subsets/<subset>.json (CooperBench standard)
+
+    Supports multiple JSON formats:
+    1. Flat list of strings: ["repo/task_id", ...]
+    2. Flat list of dicts: [{"repo": ..., "task_id": ..., "features": [...]}, ...]
+    3. CooperBench format: {"name": ..., "tasks": [{"repo": ..., "task_id": int, "pairs": [[a,b], ...]}, ...]}
 
     Args:
         dataset_path: Root path to CooperBench dataset.
         subset: Subset name ("lite" or "flash").
 
     Returns:
-        Set of allowed task keys (repo/task_id), or None if no filter file.
+        Set of allowed task keys (repo/task_id and repo/task_id/features_X_Y), or None if no filter file.
     """
+    # Try both possible locations
     subset_file = dataset_path / f"{subset}.json"
     if not subset_file.exists():
-        logger.warning(f"Subset file not found: {subset_file}, loading all tasks")
+        subset_file = dataset_path / "subsets" / f"{subset}.json"
+    if not subset_file.exists():
+        logger.warning(f"Subset file not found in {dataset_path} or {dataset_path}/subsets/, loading all tasks")
         return None
 
     try:
         with subset_file.open() as f:
             subset_data = json.load(f)
 
-        # Subset file may contain list of dicts with repo/task or just strings
         allowed = set()
+
+        # CooperBench format: {"name": ..., "tasks": [...]}
+        if isinstance(subset_data, dict) and "tasks" in subset_data:
+            has_pairs = False
+            for item in subset_data["tasks"]:
+                repo = item.get("repo", "")
+                task_id = item.get("task_id", "")
+                if repo and task_id is not None:
+                    # task_id may be int in JSON, directory is "task<int>"
+                    task_dir_name = f"task{task_id}" if not str(task_id).startswith("task") else str(task_id)
+                    pairs = item.get("pairs", [])
+                    if pairs:
+                        # When pairs are explicitly listed, ONLY add pair-level keys
+                        # (not task-level) so pair filtering is enforced
+                        has_pairs = True
+                        for pair in pairs:
+                            if len(pair) == 2:
+                                feature_key = "_".join(str(f) for f in sorted(pair))
+                                allowed.add(f"{repo}/{task_dir_name}/features_{feature_key}")
+                    else:
+                        # No pairs specified — allow all pairs from this task
+                        allowed.add(f"{repo}/{task_dir_name}")
+            logger.info(f"Loaded CooperBench subset '{subset}' with {len(allowed)} entries "
+                        f"({subset_data.get('stats', {}).get('tasks', '?')} tasks, "
+                        f"{subset_data.get('stats', {}).get('pairs', '?')} pairs), "
+                        f"pair-level filtering={'yes' if has_pairs else 'no'}")
+            return allowed if allowed else None
+
+        # Flat list format
         if isinstance(subset_data, list):
             for item in subset_data:
                 if isinstance(item, dict):
                     repo = item.get("repo", "")
                     task_id = item.get("task_id", "")
-                    if repo and task_id:
-                        allowed.add(f"{repo}/{task_id}")
-                    # Also support feature pair specification
+                    if repo and task_id is not None:
+                        task_dir_name = f"task{task_id}" if not str(task_id).startswith("task") else str(task_id)
+                        allowed.add(f"{repo}/{task_dir_name}")
                     features = item.get("features")
                     if features and repo and task_id:
                         feature_key = "_".join(str(f) for f in sorted(features))
-                        allowed.add(f"{repo}/{task_id}/features_{feature_key}")
+                        allowed.add(f"{repo}/{task_dir_name}/features_{feature_key}")
                 elif isinstance(item, str):
                     allowed.add(item)
 

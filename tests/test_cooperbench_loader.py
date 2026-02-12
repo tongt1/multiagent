@@ -181,6 +181,61 @@ class TestLoadSubsetFilter:
         allowed = _load_subset_filter(tmp_path, "lite")
         assert allowed is None
 
+    def test_cooperbench_format(self, tmp_path: Path) -> None:
+        """Should load CooperBench-style subset with tasks and pairs."""
+        subsets_dir = tmp_path / "subsets"
+        subsets_dir.mkdir()
+        subset_data = {
+            "name": "lite",
+            "description": "100-pair subset",
+            "stats": {"tasks": 2, "pairs": 3},
+            "tasks": [
+                {"repo": "repo_a", "task_id": 123, "pairs": [[1, 2], [3, 4]]},
+                {"repo": "repo_b", "task_id": 456, "pairs": [[5, 6]]},
+            ],
+        }
+        (subsets_dir / "lite.json").write_text(
+            json.dumps(subset_data), encoding="utf-8"
+        )
+
+        allowed = _load_subset_filter(tmp_path, "lite")
+        assert allowed is not None
+        # Should have pair-level keys only (no task-level since pairs are specified)
+        assert "repo_a/task123/features_1_2" in allowed
+        assert "repo_a/task123/features_3_4" in allowed
+        assert "repo_b/task456/features_5_6" in allowed
+        # task-level keys should NOT be present (pair-level filtering)
+        assert "repo_a/task123" not in allowed
+
+    def test_cooperbench_format_task_id_zero(self, tmp_path: Path) -> None:
+        """Should handle task_id=0 (falsy integer)."""
+        subsets_dir = tmp_path / "subsets"
+        subsets_dir.mkdir()
+        subset_data = {
+            "name": "test",
+            "tasks": [
+                {"repo": "repo_x", "task_id": 0, "pairs": [[1, 5]]},
+            ],
+        }
+        (subsets_dir / "test.json").write_text(
+            json.dumps(subset_data), encoding="utf-8"
+        )
+
+        allowed = _load_subset_filter(tmp_path, "test")
+        assert allowed is not None
+        assert "repo_x/task0/features_1_5" in allowed
+
+    def test_subsets_dir_fallback(self, tmp_path: Path) -> None:
+        """Should find subset file in subsets/ subdirectory."""
+        subsets_dir = tmp_path / "subsets"
+        subsets_dir.mkdir()
+        data = ["repo1/task1"]
+        (subsets_dir / "lite.json").write_text(json.dumps(data), encoding="utf-8")
+
+        allowed = _load_subset_filter(tmp_path, "lite")
+        assert allowed is not None
+        assert "repo1/task1" in allowed
+
 
 # --- load_cooperbench_dataset Tests ---
 
@@ -379,3 +434,32 @@ class TestLoadCooperBenchDataset:
         assert len(problems) == 1
         assert problems[0].repo == "repo_a"
         assert problems[0].task_id == "task2"
+
+    def test_cooperbench_subset_pair_filtering(self, tmp_path: Path) -> None:
+        """CooperBench subset with pairs should filter to exact pairs."""
+        dataset = _create_mock_dataset(tmp_path, {
+            "repo_a": {"task100": [1, 2, 3, 4]},  # 4C2=6 possible pairs
+        })
+
+        # Create CooperBench-format subset allowing only 2 specific pairs
+        subsets_dir = dataset / "subsets"
+        subsets_dir.mkdir()
+        subset_data = {
+            "name": "lite",
+            "tasks": [
+                {"repo": "repo_a", "task_id": 100, "pairs": [[1, 3], [2, 4]]},
+            ],
+        }
+        (subsets_dir / "lite.json").write_text(
+            json.dumps(subset_data), encoding="utf-8"
+        )
+
+        problems = load_cooperbench_dataset(str(dataset), subset="lite")
+        assert len(problems) == 2
+
+        feature_sets = [tuple(p.features) for p in problems]
+        assert (1, 3) in feature_sets
+        assert (2, 4) in feature_sets
+        # Other pairs should NOT be present
+        assert (1, 2) not in feature_sets
+        assert (3, 4) not in feature_sets
