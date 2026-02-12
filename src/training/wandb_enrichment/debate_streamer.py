@@ -29,22 +29,19 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+# Import reward shaping and rollout strategy registries (always available)
+from src.training.reward_shaping import create_strategy_from_config as create_reward_strategy
+from src.training.rollout_strategy import create_strategy_from_config as create_rollout_strategy
+
 # Import debate metrics (always available)
 from src.training.wandb_enrichment.debate_metrics import (
     compute_per_role_rewards,
     compute_zero_advantage_metrics,
 )
 
-# Import reward shaping and rollout strategy registries (always available)
-from src.training.reward_shaping import create_strategy_from_config as create_reward_strategy
-from src.training.rollout_strategy import create_strategy_from_config as create_rollout_strategy
-
 # Conditional imports for Flink infrastructure (not available in local testing)
 if TYPE_CHECKING:
-    from fax import config as fax_config
-    from post_training import relax
     from post_training.flink import flink_types
-    from post_training.flink.components.flink_learning_filter import async_metrics_collector
 
 try:
     from fax.config import components
@@ -215,7 +212,9 @@ class _DebateMetricStreamerImpl:
             # Log rollout table at configured intervals
             if self._get_count % self._config.log_rollout_table_every_n_gets == 0:
                 try:
-                    from src.training.wandb_enrichment.rollout_integration import log_debate_rollout_table
+                    from src.training.wandb_enrichment.rollout_integration import (
+                        log_debate_rollout_table,
+                    )
                     log_debate_rollout_table(items=items, step=self._get_count)
                 except Exception as e:
                     logger.warning(f"DebateMetricStreamer: rollout table logging failed: {e}")
@@ -223,7 +222,9 @@ class _DebateMetricStreamerImpl:
             # Write Parquet debug data at configured intervals (for Streamlit viewer)
             if self._config.debug_data_output_dir and self._get_count % self._config.log_rollout_table_every_n_gets == 0:
                 try:
-                    from src.training.wandb_enrichment.rollout_integration import write_debate_debug_data
+                    from src.training.wandb_enrichment.rollout_integration import (
+                        write_debate_debug_data,
+                    )
                     write_debate_debug_data(
                         items=items,
                         step=self._get_count,

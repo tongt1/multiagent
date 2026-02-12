@@ -191,7 +191,15 @@ class MathDebateGRPO(sweep_base.Sweep):
                     ),
                     # Phase 5: Debate metric enrichment
                     # Computes per-role rewards and zero-advantage detection metrics
-                    # Phase 8: Reward shaping integration
+                    #
+                    # Phase 9: Rollout strategy (applied before reward shaping)
+                    # Options: "identity" (default), "best_of_n", "self_consistency"
+                    # rollout_strategy="best_of_n",
+                    # rollout_strategy_params={},  # Strategy-specific params
+                    #   best_of_n: no params needed (always selects 1 best per prompt)
+                    #   self_consistency: {"agreement_threshold": 0.5}
+                    #
+                    # Phase 8: Reward shaping (applied after rollout strategy)
                     # reward_shaping_strategy selects the shaping algorithm:
                     #   "" or omitted  = identity (passthrough, default -- no behavior change)
                     #   "reward_mixing" = alpha*G + (1-alpha)*local  (params: {"alpha": 0.5})
@@ -200,6 +208,8 @@ class MathDebateGRPO(sweep_base.Sweep):
                     #   "potential_based"    = Ng et al. potential shaping    (params: {"gamma": 0.99, "potential_type": "debate_length"})
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=GENERATIONS_PER_PROMPT,
+                        # rollout_strategy="best_of_n",
+                        # rollout_strategy_params={},
                         # reward_shaping_strategy="reward_mixing",
                         # reward_shaping_params={"alpha": 0.5},
                     ),

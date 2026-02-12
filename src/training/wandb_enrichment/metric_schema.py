@@ -118,7 +118,9 @@ METRIC_ROLLOUT_STRATEGY_ITEMS_OUT = f"{DEBATE_PREFIX}rollout_strategy/items_out"
 METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO = f"{DEBATE_PREFIX}rollout_strategy/selection_ratio"
 """Fraction of items retained by rollout strategy (items_out / items_in)."""
 
-METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD = f"{DEBATE_PREFIX}rollout_strategy/mean_selected_reward"
+METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD = (
+    f"{DEBATE_PREFIX}rollout_strategy/mean_selected_reward"
+)
 """Mean reward of items after rollout strategy selection/modification."""
 
 # ============================================================================
