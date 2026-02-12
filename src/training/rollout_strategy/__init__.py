@@ -6,6 +6,7 @@ that filter which rollouts from a GRPO batch contribute to gradient updates.
 Available strategies:
 - identity: Passthrough (default), all rollouts contribute to training
 - best_of_n: Select highest-reward rollout per prompt group
+- self_consistency: Majority vote with agreement fraction reward scaling
 
 Usage:
     from src.training.rollout_strategy import create_strategy_from_config
@@ -23,6 +24,7 @@ from src.training.rollout_strategy.best_of_n import BestOfNStrategy
 
 # Import strategies to trigger auto-registration
 from src.training.rollout_strategy.identity import IdentityRolloutStrategy
+from src.training.rollout_strategy.self_consistency import SelfConsistencyStrategy
 from src.training.rollout_strategy.registry import (
     create_strategy_from_config,
     get_strategy,
@@ -34,6 +36,7 @@ __all__ = [
     "RolloutStrategy",
     "IdentityRolloutStrategy",
     "BestOfNStrategy",
+    "SelfConsistencyStrategy",
     "register_strategy",
     "get_strategy",
     "create_strategy_from_config",
