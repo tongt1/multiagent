@@ -8,6 +8,8 @@ Available strategies:
 - identity: Passthrough (default), preserves existing binary rewards
 - difference_rewards: Counterfactual marginal contribution D_i = G(z) - G(z_{-i})
 - reward_mixing: Blends global team reward with per-role local signals
+- coma_advantage: COMA-style counterfactual advantage (per-agent credit assignment)
+- potential_based: Potential-based reward shaping (Ng et al., 1999)
 
 Usage:
     from src.training.reward_shaping import create_strategy_from_config
@@ -32,12 +34,16 @@ from src.training.reward_shaping.registry import (
 from src.training.reward_shaping.identity import IdentityRewardShaper
 from src.training.reward_shaping.difference_rewards import DifferenceRewardShaper
 from src.training.reward_shaping.reward_mixing import RewardMixingShaper
+from src.training.reward_shaping.coma_advantage import COMAAdvantageShaper
+from src.training.reward_shaping.potential_shaping import PotentialBasedShaper
 
 __all__ = [
     "RewardShaper",
     "IdentityRewardShaper",
     "DifferenceRewardShaper",
     "RewardMixingShaper",
+    "COMAAdvantageShaper",
+    "PotentialBasedShaper",
     "register_strategy",
     "get_strategy",
     "create_strategy_from_config",
