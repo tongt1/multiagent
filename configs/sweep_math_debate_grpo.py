@@ -51,13 +51,13 @@ _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 # Using 7B model for faster iteration - switch to 8x15B for production runs
 NUM_TRAINING_GPUS = 8  # 24 total GPUs: 8 train + 16 vLLM
 NUM_SAMPLING_GPUS = 16  # 7B fits on 1 GPU per vLLM worker (16 workers for throughput)
-TRAIN_BATCH_SIZE = 32
+TRAIN_BATCH_SIZE = 8
 EVAL_BATCH_SIZE = 8
-TOTAL_TRAIN_STEPS = 100  # Fast iteration — enough for learning curves
-MAX_SEQUENCE_LENGTH = 8192
+TOTAL_TRAIN_STEPS = 300  # Longer run for learning curves
+MAX_SEQUENCE_LENGTH = 4096
 LEARNING_RATE = 3e-6  # Standard for 7B GRPO
 KL_BETA = 0.03
-GENERATIONS_PER_PROMPT = 8
+GENERATIONS_PER_PROMPT = 4
 EXPORT_EVERY_STEPS = 20  # Was 5 — each export costs ~40s, so 5→20 saves ~600s over 100 steps
 HARD_UPDATE_REF_EVERY_STEPS = 20  # Must match EXPORT_EVERY_STEPS
 SEED = 42
@@ -103,8 +103,8 @@ class MathDebateGRPO(sweep_base.Sweep):
             eval_batch_size=EVAL_BATCH_SIZE,
             total_train_steps=TOTAL_TRAIN_STEPS,
             max_sequence_length=MAX_SEQUENCE_LENGTH,
-            validation_every_steps=50,
-            n_gradient_accumulation_steps=2,  # 32*2=64 effective batch
+            validation_every_steps=100,
+            n_gradient_accumulation_steps=4,  # 32*4=128 effective batch
             lr_schedule={
                 "kwargs": {
                     "peak_lr": LEARNING_RATE,
@@ -128,7 +128,7 @@ class MathDebateGRPO(sweep_base.Sweep):
             },
             # Using default data from run_config
             n_last_ckpts_to_keep=2,
-            checkpoint_every_steps=50,
+            checkpoint_every_steps=100,
             minizord=flink_zord.FlinkZordConfig(
                 samplers=dict(
                     sampler_key=FlinkVllmSidecarSamplerConfig(
@@ -176,8 +176,8 @@ class MathDebateGRPO(sweep_base.Sweep):
                     sampler_endpoint_key="sampler_key",
                 ),
                 num_actors_per_batch_item=GENERATIONS_PER_PROMPT,
-                actors_queue_batches=128,  # Must be >= GENERATIONS_PER_PROMPT * (TRAIN_BATCH_SIZE / grad_accum) = 8*16
-                eval_actors_queue_batches=64,  # Must be >= GENERATIONS_PER_PROMPT * EVAL_BATCH_SIZE = 8*8
+                actors_queue_batches=32,  # Must be >= GENERATIONS_PER_PROMPT * (TRAIN_BATCH_SIZE / grad_accum) = 4*4
+                eval_actors_queue_batches=32,  # Must be >= GENERATIONS_PER_PROMPT * EVAL_BATCH_SIZE = 4*8
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
                     FilteringStreamerConfig(
@@ -191,8 +191,17 @@ class MathDebateGRPO(sweep_base.Sweep):
                     ),
                     # Phase 5: Debate metric enrichment
                     # Computes per-role rewards and zero-advantage detection metrics
+                    # Phase 8: Reward shaping integration
+                    # reward_shaping_strategy selects the shaping algorithm:
+                    #   "" or omitted  = identity (passthrough, default -- no behavior change)
+                    #   "reward_mixing" = alpha*G + (1-alpha)*local  (params: {"alpha": 0.5})
+                    #   "difference_rewards" = D_i = G - G_{-i}  (no extra params)
+                    #   "coma_advantage"     = COMA counterfactual advantage  (params: {"n_rollouts_per_prompt": N})
+                    #   "potential_based"    = Ng et al. potential shaping    (params: {"gamma": 0.99, "potential_type": "debate_length"})
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=GENERATIONS_PER_PROMPT,
+                        # reward_shaping_strategy="reward_mixing",
+                        # reward_shaping_params={"alpha": 0.5},
                     ),
                 ],
                 eval=FlinkEvalConfig(
@@ -208,7 +217,7 @@ class MathDebateGRPO(sweep_base.Sweep):
             likelihood_evals=None,
             finetuning=dict(
                 lora=dict(
-                    enabled=True,
+                    enabled=False,
                     rank=8,
                     alpha=8.0,
                 ),
@@ -224,6 +233,13 @@ class MathDebateGRPO(sweep_base.Sweep):
             read_extra_state=False,
         ),
         retries=0,
+        kjobs_compute="",
+        patch_kjobs_compute=dict(
+            env={
+                "JAX_COMPILATION_CACHE_DIR": "/data/1d/jax-cache/${USER}",
+                "JAX_LOG_COMPILES": "1",
+            },
+        ),
         sidecars=[
             sweep.SidecarConfig(
                 name=_VLLM_SIDECAR,
