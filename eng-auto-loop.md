@@ -80,7 +80,7 @@ Tracks the engineering loop across iterations. Each agent instance has its own n
     +-- insights.md        # Accumulated insights (PERSISTENT MEMORY)
     +-- test_config.json   # Auto-detected test commands
     +-- iterations/
-        +-- <AGENT_ID>-<N>/
+        +-- <N>/
             +-- plan.md                  # Summary from eng-auto-plan (bridge output)
             +-- codex_plan_review.md     # Codex review of plan
             +-- execution.md             # Summary from eng-auto-execute (bridge output)
@@ -299,8 +299,10 @@ Spawn a **Task agent** (model: opus, subagent_type: general-purpose) with the fu
   autonomous_dir: $AUTONOMOUS_DIR,
   iteration: N,
   goal: <contents of goal.md>,
+  insights: <contents of insights.md>,
+  execution_file: "iterations/<N>/execution.md",
   gsd_phase_dir: ".planning/phases/auto-${AGENT_ID}-iter-<N>",
-  plan_files: <list of PLAN.md paths from step 1>,
+  test_config: <contents of test_config.json>,
   iter_worktree_path: $ITER_WORKTREE_PATH,
   iter_branch: $ITER_BRANCH
 }
