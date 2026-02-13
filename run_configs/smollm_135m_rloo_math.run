@@ -1,0 +1,125 @@
+######### SmolLM-135M RLOO Math — MARTI reward sweep #########
+wandb.run_name = "{user}_flink_rloo_math_smollm_{date}_{time}"
+wandb.project_name = "multiagent-debate-rl"
+output_dir = "gs://co-train-oktodelete-15d/{user}/marti/smollm-135m/{date}_{time}"
+
+# -- minizord -- #
+minizord.eval.name = "flink_eval"
+minizord.eval.n_generation_steps = 4
+use_fixed_eval_set = False
+
+train_batch_size = 2
+eval_batch_size = 2
+
+# -- sampling config during training -- #
+sample.decode_loop_unroll = 4
+
+# -- reward model --
+reward_model.name = "dummyrewardmodel"
+
+# -- loss -- #
+objective.loss.name = "UNUSED"
+objective.loss.kwargs = {
+    "preference": {
+        "use_reference_policy": True,
+        "beta": 0.03,
+        "avg_loglikelihood": False,
+        "generations_per_prompt": 4,
+    },
+    "n_grad_steps_per_batch": 1,
+    "kl_top_k": 0,
+    "ema_tau": 0.0,
+}
+
+l2_trainable_params_loss.reference_ckpt = ""
+l2_trainable_params_loss.enabled = False
+l2_trainable_params_loss.alpha = 0.0
+
+# -- checkpoint saving --
+n_last_ckpts_to_keep = 2
+
+########## Fields generated for SmolLM-135M #########
+metadata.blobheart_tokenizer_id = "multilingual+255k+bos+eos+sptok+fim+agents3"
+metadata.experimental_options = {
+    "format_for_pretraining": False,
+    "use_chat_packing": True,
+    "use_special_tokens": True,
+    "whitespace_mode": "NONE",
+}
+metadata.packing_algorithm = ""
+metadata.command_dataset_version = ""
+metadata.model_type = "OfflinePreferenceModelBuilder"
+metadata.model_size = "0.135B"
+metadata.reasoning = True
+
+# -- data -- #
+max_sequence_length = 2048
+tokenizer_path = (
+    "gs://cohere-prod/encoders/releases/0.6.0/m255k_bos_eos_fim_agents3_special_tokens_with_eot_template-ns.json"
+)
+data_loader.name = "rl_dataloader"
+data_loader.kwargs = {"debug": False, "json_encoder_name": "CombLineEncoder"}
+
+data_dir_dict = {
+    "gs://cohere-dev-central-2/comb/data/math_500/2025_05_15/scenarios_train.jsonl": 1.0,
+}
+eval_data_dir_dict = {
+    "gs://cohere-dev-central-2/comb/data/math_500/2025_05_15/scenarios_train.jsonl": 1.0,
+}
+
+# -- lr schedule -- #
+lr_schedule.name = "cosine_decay"
+lr_schedule.kwargs = {"warmup_steps": 5, "total_steps": 15, "peak_lr": 3e-6, "end_lr": 3e-6}
+total_train_steps = 15
+n_validation_steps = 10
+checkpoint_every_steps = 15
+validation_every_steps = 15
+log_loss_and_steptime_every_steps = 1
+
+# -- output -- #
+fax_bot.enabled = False
+# -- wandb -- #
+wandb.enabled = True
+# -- profiling -- #
+enable_ray_profiling = False
+profile_every_steps = -1
+first_step_to_profile = 100000
+# -- architecture -- #
+objective.last_layer = "projection_to_vocab"
+use_compilation_cache = True
+use_flash_attention = True
+
+# -- finetuning -- #
+finetuning.n_last_layers = None
+finetuning.early_stopping.metric_name = None
+finetuning.early_stopping.n_steps_to_track = None
+finetuning.reset_step_number = True
+force_dont_restore_opt_state = True
+
+# -- megazord -- #
+sharding.n_tensor_parallel = 1
+write_ckpts_with_tensorstore = True
+skip_compiling_functions = False
+
+# -- batch -- #
+n_gradient_accumulation_steps = 1
+
+# -- hook frequency -- #
+log_loss_and_steptime_aggregate_mode = "average"
+log_grad_norms = False
+
+# -- optimizer -- #
+optimizer.name = "adam"
+optimizer.kwargs = {"b1": 0.9, "b2": 0.95, "eps": 1e-08, "additive_weight_decay": 0.1, "gradient_clip_norm": 1.0}
+
+# -- dropout -- #
+residual_dropout_rate = 0.0
+experimental_fast_rng = False
+
+# -- RNG seed -- #
+seed = 42
+
+# -- Quantization (disabled for SmolLM) -- #
+quantize.params = False
+quantize.activations = False
+quantize.alibi_activations = False
