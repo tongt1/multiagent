@@ -1,0 +1,321 @@
+"""Canonical debate metric schema for W&B logging and debug data.
+
+This module defines the authoritative metric names, W&B table columns, and Parquet
+debug data schema for multi-agent debate training. All debate metrics use the
+`debate/` namespace prefix to avoid collision with Flink built-in metrics.
+
+Schema versioning supports future extension without breaking Phase 7 analysis.
+"""
+
+from __future__ import annotations
+
+# ============================================================================
+# Namespace Convention
+# ============================================================================
+
+DEBATE_PREFIX = "debate/"
+"""All debate metrics must use this prefix to avoid collision with Flink metrics."""
+
+# ============================================================================
+# Per-Role Reward Metrics
+# ============================================================================
+
+METRIC_REWARD_SOLVER = f"{DEBATE_PREFIX}reward/solver"
+"""Mean reward for solver role across batch."""
+
+METRIC_REWARD_VERIFIER = f"{DEBATE_PREFIX}reward/verifier"
+"""Mean reward for verifier role across batch."""
+
+METRIC_REWARD_JUDGE = f"{DEBATE_PREFIX}reward/judge"
+"""Mean reward for judge role across batch."""
+
+# ============================================================================
+# Zero-Advantage Detection Metrics
+# ============================================================================
+
+METRIC_FRAC_ZERO_STD = f"{DEBATE_PREFIX}frac_reward_zero_std"
+"""Fraction of prompts with zero reward std across rollouts (all equal rewards)."""
+
+METRIC_FRAC_ZERO_STD_CORRECT = f"{DEBATE_PREFIX}frac_zero_std_correct"
+"""Fraction of zero-std prompts where all rollouts are correct."""
+
+METRIC_FRAC_ZERO_STD_INCORRECT = f"{DEBATE_PREFIX}frac_zero_std_incorrect"
+"""Fraction of zero-std prompts where all rollouts are incorrect."""
+
+METRIC_MEAN_REWARD_STD = f"{DEBATE_PREFIX}mean_reward_std"
+"""Mean of reward std across prompts (higher = more diversity)."""
+
+# ============================================================================
+# Per-Role KL Divergence Metrics
+# ============================================================================
+
+METRIC_KL_SOLVER = f"{DEBATE_PREFIX}kl/solver"
+"""Mean KL divergence from reference policy for solver role."""
+
+METRIC_KL_VERIFIER = f"{DEBATE_PREFIX}kl/verifier"
+"""Mean KL divergence from reference policy for verifier role."""
+
+METRIC_KL_JUDGE = f"{DEBATE_PREFIX}kl/judge"
+"""Mean KL divergence from reference policy for judge role."""
+
+# ============================================================================
+# Per-Role Loss Metrics
+# ============================================================================
+
+METRIC_LOSS_SOLVER = f"{DEBATE_PREFIX}loss/solver"
+"""Mean per-token loss for solver role."""
+
+METRIC_LOSS_VERIFIER = f"{DEBATE_PREFIX}loss/verifier"
+"""Mean per-token loss for verifier role."""
+
+METRIC_LOSS_JUDGE = f"{DEBATE_PREFIX}loss/judge"
+"""Mean per-token loss for judge role."""
+
+METRIC_LOSS_FRAC_SOLVER = f"{DEBATE_PREFIX}loss_frac/solver"
+"""Fraction of total loss from solver role (sum of fractions = 1.0)."""
+
+METRIC_LOSS_FRAC_VERIFIER = f"{DEBATE_PREFIX}loss_frac/verifier"
+"""Fraction of total loss from verifier role (sum of fractions = 1.0)."""
+
+METRIC_LOSS_FRAC_JUDGE = f"{DEBATE_PREFIX}loss_frac/judge"
+"""Fraction of total loss from judge role (sum of fractions = 1.0)."""
+
+METRIC_TOKENS_SOLVER = f"{DEBATE_PREFIX}tokens/solver"
+"""Number of solver tokens in the batch."""
+
+METRIC_TOKENS_VERIFIER = f"{DEBATE_PREFIX}tokens/verifier"
+"""Number of verifier tokens in the batch."""
+
+METRIC_TOKENS_JUDGE = f"{DEBATE_PREFIX}tokens/judge"
+"""Number of judge tokens in the batch."""
+
+METRIC_ADVANTAGE_SOLVER = f"{DEBATE_PREFIX}advantage/solver"
+"""Mean advantage value for solver tokens."""
+
+METRIC_ADVANTAGE_VERIFIER = f"{DEBATE_PREFIX}advantage/verifier"
+"""Mean advantage value for verifier tokens."""
+
+METRIC_ADVANTAGE_JUDGE = f"{DEBATE_PREFIX}advantage/judge"
+"""Mean advantage value for judge tokens."""
+
+# ============================================================================
+# Gradient Metrics
+# ============================================================================
+
+METRIC_GRAD_GLOBAL_NORM = f"{DEBATE_PREFIX}grad/global_norm"
+"""Global gradient norm (from advanced_logging or manual computation)."""
+
+# ============================================================================
+# Rollout Strategy Metrics
+# ============================================================================
+
+METRIC_ROLLOUT_STRATEGY_ITEMS_IN = f"{DEBATE_PREFIX}rollout_strategy/items_in"
+"""Number of items entering rollout strategy (before selection)."""
+
+METRIC_ROLLOUT_STRATEGY_ITEMS_OUT = f"{DEBATE_PREFIX}rollout_strategy/items_out"
+"""Number of items after rollout strategy selection."""
+
+METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO = f"{DEBATE_PREFIX}rollout_strategy/selection_ratio"
+"""Fraction of items retained by rollout strategy (items_out / items_in)."""
+
+METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD = (
+    f"{DEBATE_PREFIX}rollout_strategy/mean_selected_reward"
+)
+"""Mean reward of items after rollout strategy selection/modification."""
+
+# ============================================================================
+# GPU Utilization Metrics (from GPUStatsStreamer)
+# ============================================================================
+
+GPU_PREFIX = "gpu"
+"""All GPU metrics use this prefix."""
+
+# Training GPU aggregates
+METRIC_GPU_TRAIN_AVG_UTIL = f"{GPU_PREFIX}/train/avg_util_pct"
+"""Mean GPU utilization % across all training GPUs."""
+
+METRIC_GPU_TRAIN_MIN_UTIL = f"{GPU_PREFIX}/train/min_util_pct"
+"""Min GPU utilization % across training GPUs (detect stragglers)."""
+
+METRIC_GPU_TRAIN_MAX_UTIL = f"{GPU_PREFIX}/train/max_util_pct"
+"""Max GPU utilization % across training GPUs."""
+
+METRIC_GPU_TRAIN_AVG_MEM = f"{GPU_PREFIX}/train/avg_mem_pct"
+"""Mean GPU memory % across training GPUs."""
+
+METRIC_GPU_TRAIN_MAX_MEM = f"{GPU_PREFIX}/train/max_mem_pct"
+"""Max GPU memory % across training GPUs (OOM risk)."""
+
+METRIC_GPU_TRAIN_TOTAL_MEM_USED = f"{GPU_PREFIX}/train/total_mem_used_gib"
+"""Total GPU memory used across training GPUs (GiB)."""
+
+METRIC_GPU_TRAIN_AVG_TEMP = f"{GPU_PREFIX}/train/avg_temp_c"
+"""Mean GPU temperature (C) across training GPUs."""
+
+METRIC_GPU_TRAIN_MAX_TEMP = f"{GPU_PREFIX}/train/max_temp_c"
+"""Max GPU temperature (C) — thermal throttling risk."""
+
+METRIC_GPU_TRAIN_TOTAL_POWER = f"{GPU_PREFIX}/train/total_power_w"
+"""Total power draw across training GPUs (W)."""
+
+METRIC_GPU_TRAIN_N_GPUS = f"{GPU_PREFIX}/train/n_gpus"
+"""Number of training GPUs detected."""
+
+# vLLM GPU aggregates
+METRIC_GPU_VLLM_AVG_UTIL = f"{GPU_PREFIX}/vllm/avg_util_pct"
+"""Mean GPU utilization % across vLLM sampling GPUs."""
+
+METRIC_GPU_VLLM_AVG_MEM = f"{GPU_PREFIX}/vllm/avg_mem_pct"
+"""Mean GPU memory % across vLLM sampling GPUs."""
+
+METRIC_GPU_VLLM_MAX_MEM = f"{GPU_PREFIX}/vllm/max_mem_pct"
+"""Max GPU memory % across vLLM GPUs."""
+
+METRIC_GPU_VLLM_AVG_TEMP = f"{GPU_PREFIX}/vllm/avg_temp_c"
+"""Mean GPU temperature (C) across vLLM GPUs."""
+
+METRIC_GPU_VLLM_TOTAL_POWER = f"{GPU_PREFIX}/vllm/total_power_w"
+"""Total power draw across vLLM GPUs (W)."""
+
+METRIC_GPU_VLLM_N_GPUS = f"{GPU_PREFIX}/vllm/n_gpus"
+"""Number of vLLM GPUs detected."""
+
+# ============================================================================
+# W&B Table Schema
+# ============================================================================
+
+ROLLOUT_TABLE_COLUMNS = [
+    "step",
+    "prompt_id",
+    "prompt_text",
+    "completion",
+    "reward",
+    "solver_reward",
+    "verifier_reward",
+    "judge_reward",
+    "role_assignments",
+    "is_top",
+]
+"""
+Column definitions for W&B rollout table.
+
+Columns:
+- step: Training step number
+- prompt_id: Unique prompt identifier (from dataset)
+- prompt_text: The input problem/question
+- completion: Multi-turn debate trajectory as string
+- reward: Final reward for this rollout
+- solver_reward: Per-role reward contribution (solver)
+- verifier_reward: Per-role reward contribution (verifier)
+- judge_reward: Per-role reward contribution (judge)
+- role_assignments: Role assignment string (e.g., "S:0,V:1,J:2")
+- is_top: Boolean indicating if this is a top-k rollout for the prompt
+"""
+
+# ============================================================================
+# Parquet Debug Data Schema
+# ============================================================================
+
+CURRENT_SCHEMA_VERSION = 1
+"""Current schema version for debug data Parquet files."""
+
+
+def get_debug_data_schema() -> dict[str, str]:
+    """Get the Parquet debug data schema definition.
+
+    Returns:
+        Dictionary mapping column names to their data types.
+
+    Schema versioning:
+        - Version 1 (current): Base schema with per-role metrics
+        - Future versions: Add columns, never remove (for backward compat)
+    """
+    return {
+        # Schema version for forward compatibility
+        "schema_version": "int32",
+
+        # Existing Flink columns (from BatchDebugData)
+        "env_name": "string",
+        "trajectory": "string",
+        "agent_trajectories": "string",
+        "exception_info": "string",
+        "reward": "float32",
+        "reward_metrics": "string",  # JSON string
+        "reward_text_info": "string",
+        "unique_sample_id": "string",
+
+        # Debate-specific extensions (Plan 05-03)
+        "role_assignments": "string",
+        "solver_reward": "float32",
+        "verifier_reward": "float32",
+        "judge_reward": "float32",
+        "solver_kl": "float32",
+        "verifier_kl": "float32",
+        "judge_kl": "float32",
+    }
+
+
+# ============================================================================
+# Sampling Configuration Constants
+# ============================================================================
+
+DEFAULT_PROMPTS_PER_STEP = 4
+"""Default number of prompts to sample per training step for rollout logging."""
+
+DEFAULT_TOP_K = 2
+"""Default number of top-performing rollouts to log per prompt."""
+
+DEFAULT_BOTTOM_K = 2
+"""Default number of bottom-performing rollouts to log per prompt."""
+
+ROLLOUTS_PER_PROMPT = DEFAULT_TOP_K + DEFAULT_BOTTOM_K
+"""Total rollouts logged per prompt (top-k + bottom-k)."""
+
+MAX_ROWS_PER_STEP = DEFAULT_PROMPTS_PER_STEP * ROLLOUTS_PER_PROMPT
+"""Maximum W&B table rows per step (4 prompts × 4 rollouts = 16 rows)."""
+
+# ============================================================================
+# Metric Collections
+# ============================================================================
+
+ALL_DEBATE_METRICS = [
+    # Rewards
+    METRIC_REWARD_SOLVER,
+    METRIC_REWARD_VERIFIER,
+    METRIC_REWARD_JUDGE,
+
+    # Zero-advantage detection
+    METRIC_FRAC_ZERO_STD,
+    METRIC_FRAC_ZERO_STD_CORRECT,
+    METRIC_FRAC_ZERO_STD_INCORRECT,
+    METRIC_MEAN_REWARD_STD,
+
+    # KL divergence
+    METRIC_KL_SOLVER,
+    METRIC_KL_VERIFIER,
+    METRIC_KL_JUDGE,
+
+    # Per-role loss
+    METRIC_LOSS_SOLVER,
+    METRIC_LOSS_VERIFIER,
+    METRIC_LOSS_JUDGE,
+    METRIC_LOSS_FRAC_SOLVER,
+    METRIC_LOSS_FRAC_VERIFIER,
+    METRIC_LOSS_FRAC_JUDGE,
+    METRIC_TOKENS_SOLVER,
+    METRIC_TOKENS_VERIFIER,
+    METRIC_TOKENS_JUDGE,
+    METRIC_ADVANTAGE_SOLVER,
+    METRIC_ADVANTAGE_VERIFIER,
+    METRIC_ADVANTAGE_JUDGE,
+
+    # Gradients
+    METRIC_GRAD_GLOBAL_NORM,
+
+    # Rollout strategy
+    METRIC_ROLLOUT_STRATEGY_ITEMS_IN,
+    METRIC_ROLLOUT_STRATEGY_ITEMS_OUT,
+    METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO,
+    METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD,
+]
+"""All debate metric names for validation and documentation."""

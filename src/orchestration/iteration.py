@@ -14,6 +14,8 @@ class IterationController:
         """
         self.max_iterations = max_iterations
         self.iteration_history: list[dict[str, str]] = []
+        self.termination_reason: str | None = None
+        self.termination_iteration: int | None = None
 
     def should_continue(self, iteration: int, verification_passed: bool) -> bool:
         """Determine if iteration should continue.
@@ -27,11 +29,15 @@ class IterationController:
         """
         # Stop if verification passed
         if verification_passed:
-            logger.info(f"Iteration {iteration}: Verification passed, stopping")
+            self.termination_reason = "verifier_passed"
+            self.termination_iteration = iteration
+            logger.info(f"Iteration {iteration}: Verification passed — early termination")
             return False
 
         # Stop if reached max iterations
         if iteration >= self.max_iterations:
+            self.termination_reason = "max_iterations_reached"
+            self.termination_iteration = iteration
             logger.warning(
                 f"Iteration {iteration}: Reached max_iterations={self.max_iterations}, stopping"
             )
@@ -91,3 +97,17 @@ class IterationController:
                 "critique": critique,
             }
         )
+
+    def get_termination_metadata(self) -> dict:
+        """Return termination metadata for trajectory logging.
+
+        Returns:
+            Dict with termination details including reason, iteration, and history
+        """
+        return {
+            "termination_reason": self.termination_reason,
+            "termination_iteration": self.termination_iteration,
+            "max_iterations": self.max_iterations,
+            "early_termination": self.termination_reason == "verifier_passed",
+            "iterations_history": self.iteration_history,
+        }

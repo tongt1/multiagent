@@ -411,3 +411,108 @@ def test_export_to_marti_format_multiple_turns_per_agent():
     turn_1 = trajectory[0][0][1]
     assert turn_0.rewards == 0.5
     assert turn_1.rewards == 1.0
+
+
+def test_build_debate_agent_graph():
+    """Test building 1-solver debate agent graph."""
+    from src.training.marti_exporter import build_debate_agent_graph
+
+    graph = build_debate_agent_graph()
+
+    # Check structure
+    assert "agents" in graph
+    assert "spatial_masks" in graph
+    assert "temporal_masks" in graph
+    assert "num_rounds" in graph
+
+    # Check agents - should have 1 solver + 1 verifier + 1 judge = 3 total
+    agents = graph["agents"]
+    assert len(agents) == 3
+
+    # Check solver
+    assert agents[0]["agent_name"] == "solver_0"
+    assert agents[0]["agent_role"] == "solver"
+    assert agents[0]["round_idx"] == 0
+
+    # Check verifier
+    assert agents[1]["agent_name"] == "verifier"
+    assert agents[1]["agent_role"] == "verifier"
+    assert agents[1]["round_idx"] == 1
+
+    # Check judge
+    assert agents[2]["agent_name"] == "judge"
+    assert agents[2]["agent_role"] == "judge"
+    assert agents[2]["round_idx"] == 2
+
+    # Check num_rounds
+    assert graph["num_rounds"] == 3
+
+
+def test_export_to_marti_format_debate_mode():
+    """Test exporting trajectory with mode='debate' uses 1-solver graph."""
+    entries = [
+        TrajectoryEntry(
+            timestamp="2024-01-01T00:00:00",
+            run_id="test_run",
+            step_id=0,
+            agent="solver_0",
+            action="solve",
+            input={"problem": "test"},
+            output={"solution": "answer"},
+            metadata={
+                "agent_name": "solver_0",
+                "agent_role": "solver",
+                "round_idx": 0,
+                "spatial_predecessors": [],
+                "temporal_predecessors": [],
+            },
+            reward=1.0,
+        ),
+    ]
+
+    # Export with debate mode
+    marti_traj = export_to_marti_format(
+        entries=entries,
+        problem="test",
+        label="answer",
+        mode="debate",
+    )
+
+    # Should work fine with 1-solver graph
+    assert marti_traj.problem == "test"
+    assert len(marti_traj.trajectory) == 1
+
+
+def test_export_to_marti_format_baseline_mode():
+    """Test exporting trajectory with mode='baseline' uses 3-solver graph."""
+    entries = [
+        TrajectoryEntry(
+            timestamp="2024-01-01T00:00:00",
+            run_id="test_run",
+            step_id=0,
+            agent="solver_0",
+            action="solve",
+            input={"problem": "test"},
+            output={"solution": "answer"},
+            metadata={
+                "agent_name": "solver_0",
+                "agent_role": "solver",
+                "round_idx": 0,
+                "spatial_predecessors": [],
+                "temporal_predecessors": [],
+            },
+            reward=1.0,
+        ),
+    ]
+
+    # Export with baseline mode (3-solver)
+    marti_traj = export_to_marti_format(
+        entries=entries,
+        problem="test",
+        label="answer",
+        mode="baseline",
+    )
+
+    # Should work fine with 3-solver graph
+    assert marti_traj.problem == "test"
+    assert len(marti_traj.trajectory) == 1

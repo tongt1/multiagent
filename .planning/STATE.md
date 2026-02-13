@@ -1,72 +1,88 @@
 # Project State
 
+## Project Reference
+
+See: /home/terry_tong_cohere_com/.planning/PROJECT.md (updated 2026-02-02)
+
+**Core value:** Produce rigorous, reproducible comparisons between multi-agent debate RL and single-agent RLVR on math reasoning, with the only variable being how training data is generated (debate vs no debate).
+
+**Current focus:** Phase 8 - Reward Shaping
+
 ## Current Position
 
-**Phase:** 2 of 3 (Scale and Verify)
-**Plan:** 2 of 6 in current phase
-**Status:** In progress - Plan 02-04 completed (gap closure)
-**Last activity:** 2026-02-02 - Completed 02-04-PLAN.md
+Phase: 8 (Reward Shaping)
+Plan: 4 of 4 in current phase (complete)
+Status: Phase 8 complete
+Last activity: 2026-02-12 — Completed 08-04-PLAN.md (Reward Shaping Integration)
 
-**Progress:** Overall 5/8 plans complete (62.5%)
-```
-Phase 1: [████████████████████████] 100% (3/3 plans) ✓
-  ├─ 01-01: Project Foundation ✓
-  ├─ 01-02: Agent Implementations ✓
-  └─ 01-03: Orchestrator ✓
+Progress: [██████████] 100% (Phase 8: 4/4 plans)
 
-Phase 2: [████████░░░░░░░░░░░░░░░░] 33% (2/6 plans)
-  ├─ 02-01: Batch Execution Infrastructure ✓
-  ├─ 02-02: Benchmark Evaluation
-  ├─ 02-03: Distributed Execution
-  ├─ 02-04: Reward Integration (gap closure) ✓
-  ├─ 02-05: Trajectory Analysis
-  └─ 02-06: Integration Testing
-```
+## Performance Metrics
 
-## Accumulated Decisions
+**Velocity:**
+- Total plans completed: 3
+- Average duration: 3 min
+- Total execution time: 0.17 hours
 
-| ID | Decision | Plan | Impact | Rationale |
-|----|----------|------|--------|-----------|
-| D1 | Use Python 3.14 for Poetry environment | 01-01 | Environment | Latest available, exceeds 3.11 minimum |
-| D2 | pytest 8.2 for compatibility | 01-01 | Testing | pytest-asyncio requires pytest <9 |
-| D3 | json.dumps for config hashing | 01-01 | Config | Pydantic 2.x model_dump_json lacks sort_keys |
-| D4 | Per-agent cost tracking | 01-01 | Monitoring | Granular budget analysis by model AND agent |
-| D5 | Mock all LLM calls in tests | 01-01 | Testing | Zero API cost, reproducible tests |
-| D6 | Type assertions for Pydantic response models | 01-02 | Type safety | Mypy cannot infer specific response_model return type |
-| D7 | Circular critique detection requires 3+ iterations | 01-02 | Iteration control | Avoid false positives from legitimate similar feedback |
-| D8 | Judge always runs even if verification failed | 01-02 | Benchmarking | Need quality scores for all runs for comparison |
-| D9 | Use asyncio.gather with return_exceptions=True for batch | 02-01 | Batch execution | Enables partial results when some problems fail (vs TaskGroup) |
-| D10 | Fresh pipeline instance per problem in batch | 02-01 | State isolation | Avoids shared CostTracker/TrajectoryLogger state issues |
-| D11 | Dataset streaming with limit for memory efficiency | 02-01 | Resource management | Load subset of MATH/HumanEval without full dataset in memory |
-| D12 | Progress callback pattern for real-time updates | 02-01 | UX | Rich progress bar updates incrementally during batch execution |
-| D13 | Compute rewards after pipeline completes in batch executor | 02-04 | Evaluation | Keeps reward calculation separate from solver-verifier-judge loop |
-| D14 | Use 0.95 threshold for verification pass rate | 02-04 | Metrics | Allows small numerical errors while requiring near-perfect correctness |
-| D15 | Store reward computation errors in ground_truth_details | 02-04 | Debugging | Preserves error info without breaking pipeline execution |
+**By Phase:**
 
-## Blockers/Concerns
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 01-data-generation-foundation | 2 | 8 min | 4 min |
+| 08-reward-shaping | 1 | 2 min | 2 min |
 
-| Type | Description | Plan | Status |
-|------|-------------|------|--------|
-| Concern | PipelineConfig YAML/JSON loading needs custom settings sources | 01-01 | Non-blocking, can construct programmatically |
-| Concern | datetime.utcnow() deprecated in Python 3.14 | 01-01 | Non-blocking, works but should migrate to datetime.now(timezone.utc) |
+**Recent Trend:**
+- Last 5 plans: 01-01 (4min), 01-02 (4min), 08-04 (2min)
+- Trend: Improving velocity
 
-## Brief Alignment Status
+*Updated after each plan completion*
 
-**On track.** Phase 1 complete. Phase 2 progress: 2/6 plans complete (33%).
+## Accumulated Context
 
-**Latest (02-04 - Gap Closure):** Reward integration complete in 3 min:
-- Ground truth reward computation integrated into BatchPipelineExecutor
-- PipelineResult extended with ground_truth_reward and ground_truth_details fields
-- CLI displays verification pass rate and average GT reward
-- 17/17 tests passing including 4 new reward integration tests
-- No deviations from plan - executed exactly as specified
+### Decisions
 
-**Previous (02-01):** Batch execution infrastructure with BatchPipelineExecutor, DatasetLoader, and CLI batch subcommand.
+Decisions are logged in /home/terry_tong_cohere_com/.planning/PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-**Next:** Plan 02-02 will implement benchmark evaluation infrastructure for MATH/HumanEval scoring.
+- POST_TRAINING as backend, not full replacement: Scaffold controls training loop for flexibility; POST_TRAINING handles infra concerns
+- BEE for both reward and eval: Single eval system for consistency between training signal and benchmark evaluation
+- Math-only for initial experiments: Verifiable rewards are cleanest for math; reduces variables
+- Single-agent RLVR as sole baseline: Isolates the effect of multi-agent debate on training data quality
+- REINFORCE/GRPO only initially: Simpler algorithms reduce debugging surface for initial comparison
+
+**From 01-01 (MATH 500 loader):**
+- Fixed random seed (42) for reproducible sampling: Ensures consistent 500 problems across experiments
+- Filter before sampling: Remove ambiguous answers before stratification to guarantee all 500 are SymPy-verifiable
+- Stratified sampling with redistribution: 100 per level with overflow redistribution maintains balance
+- Cache to data/math500_cache.json: First load creates cache, subsequent loads instant
+
+**From 01-02 (Ground truth rewards and early termination):**
+- Binary ground truth reward (1.0/0.0) computed via compute_math_reward when problem_metadata contains ground_truth
+- max_iterations changed from 7 to 5 as decided for Phase 1 MATH 500 generation
+- PipelineConfig.mode field controls debate (1-solver) vs baseline (3-solver) architecture
+- Termination metadata logged in trajectory for RLVR analysis of early vs max iteration stops
+
+**From 08-04 (Reward Shaping Integration):**
+- Shaped rewards logged as additional debate/shaped_reward/* metrics alongside unshaped originals for backward compatibility
+- Reward shaping config co-located in DebateMetricStreamerConfig rather than separate config class
+- Error handling wraps reward shaping to prevent failures from breaking training pipeline
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+**From 01-01:**
+- MATH dataset DMCA-restricted on HuggingFace: Local fallback implemented but may need local data/MATH/test/ files for production use beyond mocked tests
 
 ## Session Continuity
 
-**Last session:** 2026-02-02 05:24 UTC
-**Stopped at:** Completed 02-04-PLAN.md (gap closure)
-**Resume file:** None
+Last session: 2026-02-12 03:22:12 UTC
+Stopped at: Completed 08-04-PLAN.md (Reward Shaping Integration)
+Resume file: None
+Next action: Phase 8 complete. Begin next milestone phase or run experiments with reward shaping strategies.
+
+---
+*State initialized: 2026-02-02*
+*Last updated: 2026-02-12*

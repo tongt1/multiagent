@@ -43,7 +43,8 @@ class PipelineConfig(BaseSettings):
     solver: AgentConfig
     verifier: AgentConfig
     judge: JudgeConfig
-    max_iterations: int = Field(default=7, ge=1, le=20)
+    mode: Literal["debate", "baseline"] = "debate"
+    max_iterations: int = Field(default=5, ge=1, le=20)
     trajectory_output_dir: str = "trajectories"
     config_version: str
 

@@ -43,7 +43,15 @@ class SolverVerifierJudgePipeline:
         """
         self.config = config
 
-        # Create LLM clients for each agent
+        # Route to baseline runner if mode is baseline
+        if self.config.mode == "baseline":
+            from src.orchestration.baseline_runner import BaselineRunner
+
+            self._baseline_runner = BaselineRunner(config)
+            # Skip debate pipeline initialization for baseline mode
+            return
+
+        # Create LLM clients for each agent (debate mode only)
         self.solver_client = LLMClient(
             model=config.solver.model,
             temperature=config.solver.temperature,
@@ -88,6 +96,14 @@ class SolverVerifierJudgePipeline:
         Returns:
             PipelineResult with all execution details
         """
+        # Route to baseline runner if mode is baseline
+        if self.config.mode == "baseline":
+            return await self._baseline_runner.run(
+                problem_description=problem_description,
+                problem_metadata=problem_metadata,
+            )
+
+        # DEBATE MODE EXECUTION BELOW
         # Generate run ID
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         run_id = f"run_{timestamp}_{self.config_hash}"
@@ -282,6 +298,48 @@ class SolverVerifierJudgePipeline:
                 )
                 judge_score = 0.0
 
+            # GROUND TRUTH REWARD (when ground truth available)
+            ground_truth_reward = None
+            ground_truth_details = None
+            if problem_metadata and "ground_truth" in problem_metadata:
+                from src.evaluation.math_verifier import compute_math_reward
+                try:
+                    reward_score, verification_result = compute_math_reward(
+                        solution=current_solution,
+                        ground_truth_solution=problem_metadata["ground_truth"],
+                    )
+                    ground_truth_reward = reward_score  # Binary: 1.0 or 0.0
+                    ground_truth_details = {
+                        "is_correct": verification_result.is_correct,
+                        "predicted_answer": verification_result.predicted_answer,
+                        "expected_answer": verification_result.expected_answer,
+                        "method": verification_result.method,
+                    }
+
+                    # Log reward step in trajectory
+                    termination_meta = self.iteration_controller.get_termination_metadata()
+                    traj.log_step(
+                        agent="reward",
+                        action="ground_truth_verify",
+                        input_data={
+                            "solution": current_solution,
+                            "ground_truth": problem_metadata["ground_truth"],
+                        },
+                        output_data={
+                            "reward": reward_score,
+                            "is_correct": verification_result.is_correct,
+                            "method": verification_result.method,
+                        },
+                        metadata={
+                            "predicted_answer": verification_result.predicted_answer,
+                            "expected_answer": verification_result.expected_answer,
+                            **termination_meta,
+                        },
+                    )
+                    logger.info(f"Ground truth reward: {reward_score} (method: {verification_result.method})")
+                except Exception as e:
+                    logger.warning(f"Ground truth verification failed: {e}")
+
         # Get cost summary
         cost_summary = self.cost_tracker.summary()
 
@@ -296,6 +354,8 @@ class SolverVerifierJudgePipeline:
             trajectory_path=str(trajectory_path),
             token_usage=self.cost_tracker.total_tokens(),
             cost_summary=cost_summary,
+            ground_truth_reward=ground_truth_reward,
+            ground_truth_details=ground_truth_details,
         )
 
         logger.info(

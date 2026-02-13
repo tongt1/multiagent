@@ -379,3 +379,120 @@ async def test_pipeline_cost_tracker_accumulates(mock_config, mock_token_usage, 
 
         # Check that cost_summary has correct total
         assert result.cost_summary["total_tokens"]["total_tokens"] == expected_total
+
+
+@pytest.mark.asyncio
+async def test_pipeline_config_mode_default(mock_config):
+    """Test that PipelineConfig has mode='debate' by default."""
+    assert mock_config.mode == "debate"
+    assert mock_config.max_iterations == 5
+
+
+@pytest.mark.asyncio
+async def test_pipeline_ground_truth_reward_computed(mock_config, mock_token_usage, tmp_path):
+    """Test that ground truth reward is computed when problem_metadata includes ground_truth."""
+    mock_config.trajectory_output_dir = str(tmp_path / "trajectories")
+
+    mock_solver_response = SolverResponse(
+        solution="The answer is \\boxed{42}",
+        reasoning="Calculation",
+        confidence=0.9,
+    )
+    mock_verif_response = VerificationResult(passed=True, confidence=0.9)
+    mock_judgment = Judgment(score=0.9, reasoning="Good", strengths=["Correct"], weaknesses=[])
+
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
+        mock_client = MagicMock()
+        mock_client.generate = AsyncMock()
+        mock_llm_client_cls.return_value = mock_client
+
+        mock_client.generate.side_effect = [
+            (mock_solver_response, mock_token_usage),
+            (mock_verif_response, mock_token_usage),
+            (mock_judgment, mock_token_usage),
+        ]
+
+        pipeline = SolverVerifierJudgePipeline(mock_config)
+        result = await pipeline.run(
+            problem_description="What is the answer?",
+            problem_metadata={"ground_truth": "The answer is \\boxed{42}"},
+        )
+
+        # Ground truth reward should be computed
+        assert result.ground_truth_reward is not None
+        assert result.ground_truth_reward == 1.0  # Correct answer
+        assert result.ground_truth_details is not None
+        assert result.ground_truth_details["is_correct"] is True
+        assert result.ground_truth_details["predicted_answer"] == "42"
+        assert result.ground_truth_details["expected_answer"] == "42"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_ground_truth_reward_none_without_metadata(mock_config, mock_token_usage, tmp_path):
+    """Test that ground truth reward is None when no ground truth provided."""
+    mock_config.trajectory_output_dir = str(tmp_path / "trajectories")
+
+    mock_solver_response = SolverResponse(
+        solution="The answer is \\boxed{42}",
+        reasoning="Calculation",
+        confidence=0.9,
+    )
+    mock_verif_response = VerificationResult(passed=True, confidence=0.9)
+    mock_judgment = Judgment(score=0.9, reasoning="Good", strengths=["Correct"], weaknesses=[])
+
+    with patch("src.orchestration.pipeline.LLMClient") as mock_llm_client_cls:
+        mock_client = MagicMock()
+        mock_client.generate = AsyncMock()
+        mock_llm_client_cls.return_value = mock_client
+
+        mock_client.generate.side_effect = [
+            (mock_solver_response, mock_token_usage),
+            (mock_verif_response, mock_token_usage),
+            (mock_judgment, mock_token_usage),
+        ]
+
+        pipeline = SolverVerifierJudgePipeline(mock_config)
+        result = await pipeline.run(problem_description="What is the answer?")
+
+        # Ground truth reward should be None
+        assert result.ground_truth_reward is None
+        assert result.ground_truth_details is None
+
+
+def test_iteration_controller_termination_metadata():
+    """Test that IterationController records termination metadata."""
+    from src.orchestration.iteration import IterationController
+
+    controller = IterationController(max_iterations=5)
+
+    # Initially no termination
+    metadata = controller.get_termination_metadata()
+    assert metadata["termination_reason"] is None
+    assert metadata["termination_iteration"] is None
+    assert metadata["max_iterations"] == 5
+    assert metadata["early_termination"] is False
+
+    # Simulate verification passing on iteration 2
+    should_continue = controller.should_continue(iteration=2, verification_passed=True)
+    assert should_continue is False
+
+    metadata = controller.get_termination_metadata()
+    assert metadata["termination_reason"] == "verifier_passed"
+    assert metadata["termination_iteration"] == 2
+    assert metadata["early_termination"] is True
+
+
+def test_iteration_controller_max_iterations_metadata():
+    """Test that IterationController records max_iterations_reached metadata."""
+    from src.orchestration.iteration import IterationController
+
+    controller = IterationController(max_iterations=3)
+
+    # Simulate reaching max iterations
+    should_continue = controller.should_continue(iteration=3, verification_passed=False)
+    assert should_continue is False
+
+    metadata = controller.get_termination_metadata()
+    assert metadata["termination_reason"] == "max_iterations_reached"
+    assert metadata["termination_iteration"] == 3
+    assert metadata["early_termination"] is False

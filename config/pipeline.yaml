@@ -1,5 +1,6 @@
 config_version: "v1.0"
-max_iterations: 7
+mode: "debate"
+max_iterations: 5
 trajectory_output_dir: "trajectories"
 
 solver:

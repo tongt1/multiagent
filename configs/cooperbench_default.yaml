@@ -1,0 +1,48 @@
+# CooperBench Default Configuration
+# Cooperative coding evaluation with debate-as-cooperation paradigm
+
+mode: coop  # "coop" (2 agents) or "solo" (1 agent baseline)
+
+# Dataset settings
+dataset:
+  path: dataset/
+  subset: lite  # lite (100 pairs), flash (larger), or null (all 652 tasks)
+
+# Agent settings
+agents:
+  solver:
+    model: command-r-plus
+    temperature: 0.2
+    max_tokens: 8192
+    role: cooperbench_solver
+  verifier:
+    model: command-r-plus
+    temperature: 0.2
+    max_tokens: 8192
+    role: cooperbench_verifier
+
+# Evaluation settings
+evaluation:
+  backend: docker  # docker, modal, or gcp
+  timeout: 600     # seconds per test execution
+
+# Cooperation settings
+cooperation:
+  max_rounds: 3           # debate iterations (approach exchange rounds)
+  messaging_enabled: true  # inter-agent communication
+  git_enabled: false       # shared git server (not needed for debate mode)
+
+# Parallelism
+execution:
+  max_parallel_tasks: 4
+
+# Reward settings
+reward:
+  type: binary    # binary (1.0/0.0), partial (0.5 per feature), or shaped
+  merge_bonus: 0.1  # bonus for clean merge (shaped reward only)
+
+# Output settings
+output:
+  dir: cooperbench_results
+  save_patches: true
+  save_trajectories: true

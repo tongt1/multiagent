@@ -229,6 +229,73 @@ Examples:
         help="Enable debug logging",
     )
 
+    # ========== GENERATE SUBCOMMAND (MATH 500 trajectory generation) ==========
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="Generate MATH 500 trajectories for debate and baseline modes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate debate trajectories
+  python -m src.cli.main generate --mode debate --config config/pipeline_math.yaml
+
+  # Generate baseline trajectories
+  python -m src.cli.main generate --mode baseline --config config/pipeline_math.yaml
+
+  # Generate both modes
+  python -m src.cli.main generate --mode both --config config/pipeline_math.yaml
+
+  # Test with limited problems
+  python -m src.cli.main generate --mode both --config config/pipeline_math.yaml --limit 10
+        """,
+    )
+
+    generate_parser.add_argument(
+        "--mode",
+        required=True,
+        choices=["debate", "baseline", "both"],
+        help="Generation mode: debate, baseline, or both",
+    )
+
+    generate_parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to pipeline configuration YAML",
+    )
+
+    generate_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of problems (for testing; default: all 500)",
+    )
+
+    generate_parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=10,
+        help="Maximum concurrent API calls (default: 10)",
+    )
+
+    generate_parser.add_argument(
+        "--output-dir",
+        default="trajectories",
+        help="Base output directory (default: trajectories)",
+    )
+
+    generate_parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42)",
+    )
+
+    generate_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     # ========== EXPORT-MARTI SUBCOMMAND (trajectory export) ==========
     export_marti_parser = subparsers.add_parser(
         "export-marti",
@@ -513,6 +580,130 @@ async def async_main() -> int:
                 poll_interval=args.poll_interval,
                 console=console,
             )
+
+        elif args.command == "generate":
+            # MATH 500 trajectory generation
+            logger.info(f"Generating MATH 500 trajectories in {args.mode} mode")
+            logger.info(f"Configuration: {args.config}")
+
+            # Import the generation script's main logic
+            import random
+            import time
+            from pathlib import Path
+            from pydantic_yaml import parse_yaml_file_as
+
+            from src.data.math500 import load_math500, get_math500_stats
+            from src.orchestration.batch_executor import BatchPipelineExecutor
+            from src.orchestration.baseline_runner import BaselineRunner
+
+            # Set random seed
+            random.seed(args.seed)
+
+            # Load MATH 500 dataset
+            console.print("[cyan]Loading MATH 500 dataset...[/cyan]")
+            problems = load_math500(seed=args.seed)
+
+            # Apply limit if specified
+            if args.limit:
+                problems = problems[:args.limit]
+                console.print(f"[yellow]Limited to first {args.limit} problems[/yellow]")
+
+            # Show dataset statistics
+            stats = get_math500_stats(problems)
+            console.print(f"[green]Loaded {stats['total']} problems[/green]")
+            console.print(f"Distribution by level: {dict(stats['per_level'])}")
+
+            # Assign sequential trajectory IDs to problems
+            for idx, problem in enumerate(problems):
+                problem.metadata["trajectory_id"] = idx
+
+            # Load pipeline config
+            config = parse_yaml_file_as(PipelineConfig, args.config)
+
+            # Create base output directory
+            output_base = Path(args.output_dir)
+            output_base.mkdir(parents=True, exist_ok=True)
+
+            # Import generation helper functions
+            from scripts.generate_trajectories import (
+                run_debate_mode,
+                run_baseline_mode,
+                print_summary,
+                save_generation_metadata,
+            )
+
+            start_time = time.time()
+
+            if args.mode == "debate":
+                output_dir = output_base / "debate"
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                batch_result = await run_debate_mode(
+                    problems=problems,
+                    config=config,
+                    output_dir=output_dir,
+                    concurrency=args.concurrency,
+                    console=console,
+                )
+
+                print_summary("debate", batch_result, output_dir, console)
+                save_generation_metadata("debate", batch_result, output_dir, problems, args)
+
+            elif args.mode == "baseline":
+                output_dir = output_base / "baseline"
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                batch_result = await run_baseline_mode(
+                    problems=problems,
+                    config=config,
+                    output_dir=output_dir,
+                    concurrency=args.concurrency,
+                    console=console,
+                )
+
+                print_summary("baseline", batch_result, output_dir, console)
+                save_generation_metadata("baseline", batch_result, output_dir, problems, args)
+
+            elif args.mode == "both":
+                # Run debate mode
+                console.print("\n[bold cyan]===== DEBATE MODE =====[/bold cyan]")
+                debate_dir = output_base / "debate"
+                debate_dir.mkdir(parents=True, exist_ok=True)
+
+                debate_result = await run_debate_mode(
+                    problems=problems,
+                    config=config,
+                    output_dir=debate_dir,
+                    concurrency=args.concurrency,
+                    console=console,
+                )
+
+                print_summary("debate", debate_result, debate_dir, console)
+                save_generation_metadata("debate", debate_result, debate_dir, problems, args)
+
+                # Run baseline mode
+                console.print("\n[bold yellow]===== BASELINE MODE =====[/bold yellow]")
+                baseline_dir = output_base / "baseline"
+                baseline_dir.mkdir(parents=True, exist_ok=True)
+
+                baseline_result = await run_baseline_mode(
+                    problems=problems,
+                    config=config,
+                    output_dir=baseline_dir,
+                    concurrency=args.concurrency,
+                    console=console,
+                )
+
+                print_summary("baseline", baseline_result, baseline_dir, console)
+                save_generation_metadata("baseline", baseline_result, baseline_dir, problems, args)
+
+                # Print combined summary
+                console.print("\n[bold green]===== OVERALL SUMMARY =====[/bold green]")
+                console.print(f"Total elapsed time: {time.time() - start_time:.2f}s")
+                console.print(f"Debate: {debate_result.succeeded}/{debate_result.total} succeeded")
+                console.print(f"Baseline: {baseline_result.succeeded}/{baseline_result.total} succeeded")
+
+            console.print("\n[green]✓[/green] Generation complete!")
 
         elif args.command == "export-marti":
             # MARTI trajectory export
