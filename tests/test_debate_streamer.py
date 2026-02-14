@@ -564,3 +564,82 @@ def test_reward_mutation_fallback_on_missing_role():
     assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
     # Custom role: not in shaped dict, should fall back to raw reward (3.0)
     assert result_items[1].data["rewards"].item() == pytest.approx(3.0)
+
+
+# ─── WandB config update tests ─────────────────────────────────────────────
+
+
+def test_wandb_config_update_called_on_first_get():
+    """wandb.config.update is called once on first get() with strategy name."""
+    import sys
+    from unittest.mock import patch, MagicMock
+
+    items = [MockActorOutputItem(reward=0.5, role_label="solver")]
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=1,
+        reward_shaping_strategy="difference_rewards",
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    # Create a mock wandb module with run and config attributes
+    mock_wandb = MagicMock()
+    mock_wandb.run = MagicMock()  # truthy => wandb.run is not None
+    mock_wandb.config = MagicMock()
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace"), \
+         patch.dict(sys.modules, {"wandb": mock_wandb}):
+        # First get() should trigger wandb.config.update
+        streamer.get()
+        assert mock_wandb.config.update.call_count == 1
+        call_args = mock_wandb.config.update.call_args
+        config_dict = call_args[0][0]
+        assert config_dict["reward_shaping_strategy"] == "difference_rewards"
+
+        # Second get() should NOT trigger wandb.config.update again
+        streamer.get()
+        assert mock_wandb.config.update.call_count == 1
+
+
+def test_wandb_config_update_skipped_when_no_run():
+    """wandb.config.update is NOT called when wandb.run is None."""
+    import sys
+    from unittest.mock import patch, MagicMock
+
+    items = [MockActorOutputItem(reward=0.5, role_label="solver")]
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=1,
+        reward_shaping_strategy="potential_based",
+        reward_shaping_params={"gamma": 0.99, "potential_type": "zero"},
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+
+    # Create a mock wandb module with run=None
+    mock_wandb = MagicMock()
+    mock_wandb.run = None
+
+    with patch("src.training.wandb_enrichment.workspace_init.init_debate_workspace"), \
+         patch.dict(sys.modules, {"wandb": mock_wandb}):
+        streamer.get()
+        assert mock_wandb.config.update.call_count == 0
+
+
+def test_workspace_template_has_shaped_reward_panels():
+    """Workspace template source contains shaped reward panel definitions."""
+    from pathlib import Path
+
+    template_path = Path("src/training/wandb_enrichment/workspace_template.py")
+    source = template_path.read_text()
+
+    # Verify shaped reward metric constants are imported and used
+    assert "METRIC_SHAPED_REWARD_MEAN" in source
+    assert "METRIC_SHAPED_REWARD_SOLVER" in source
+
+    # Verify panel titles exist
+    assert "Mean Shaped Reward by Strategy" in source
+    assert "Per-Role Shaped Rewards" in source
