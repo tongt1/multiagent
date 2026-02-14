@@ -79,7 +79,7 @@ Deferred to future work. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| Custom pipeline wrapper for execution | Paper uses OpenHands agent SDK; our custom wrapper generates patches via raw prompts — architecturally incomparable |
+| Custom pipeline wrapper for execution | Paper uses OpenHands agent SDK; our custom wrapper generates patches via raw prompts -- architecturally incomparable |
 | Interactive Streamlit dashboard | Static figures are sufficient for reproduction; dashboard adds maintenance burden |
 | Real-time experiment monitoring | Experiments run asynchronously; analysis is post-hoc |
 | Figures 1, 2, 3 from paper | Not requested; focusing on figures 4, 5, 6 |
@@ -123,10 +123,10 @@ Deferred to future work. Tracked but not in current roadmap.
 | COMP-01 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 28 total
-- Mapped to phases: 28
+- v1 requirements: 30 total
+- Mapped to phases: 30
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-14 after initial definition*
+*Last updated: 2026-02-14 after roadmap creation*
