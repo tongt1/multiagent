@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 1 of 3 (End-to-End Reward Integration)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-02-14 -- Roadmap created
+Plan: 1 of 2 in current phase
+Status: Plan 01-01 complete, ready for 01-02
+Last activity: 2026-02-14 -- Completed 01-01 (shaped reward write-back)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [###░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 5min
+- Total execution time: 0.08 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-end-to-end-reward-integration | 1 | 5min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 5min
+- Trend: First plan complete
 
 *Updated after each plan completion*
 
@@ -45,19 +45,23 @@ Recent decisions affecting current work:
 - SmolLM-135M chosen for fast iteration (minutes not hours)
 - All 5 strategies in single comparison with same hyperparams
 - Default strategy hyperparams (no per-strategy tuning in v1)
+- Refactored _compute_shaped_reward_metrics to _compute_and_apply_shaped_rewards returning (metrics, shaped_per_item) tuple
+- Judge items always receive 0.0 reward regardless of strategy type
+- Missing role in per-role dict falls back to raw reward
+- Original dtype preserved via np.array(value, dtype=original_dtype)
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- Reward shaping strategies exist in src/training/reward_shaping/ but are not yet wired into DebateMetricStreamer
+- RESOLVED: Reward shaping strategies now wired into DebateMetricStreamer with write-back to item.data["rewards"]
 - DebateMetricStreamerConfig has reward_shaping_strategy/params fields but they are commented out in SWEEP config
-- Critical to verify shaped rewards flow to GRPO/RLOO loss, not just WandB metrics
+- Next: verify shaped rewards flow to GRPO/RLOO loss via gradient check (Plan 01-02)
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Roadmap created, ready to plan Phase 1
-Resume file: None
+Stopped at: Completed 01-01-PLAN.md (shaped reward write-back)
+Resume file: .planning/phases/01-end-to-end-reward-integration/01-01-SUMMARY.md
