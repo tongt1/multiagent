@@ -56,27 +56,27 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RINT-01 | — | Pending |
-| RINT-02 | — | Pending |
-| RINT-03 | — | Pending |
-| RINT-04 | — | Pending |
-| ECFG-01 | — | Pending |
-| ECFG-02 | — | Pending |
-| ECFG-03 | — | Pending |
-| ECFG-04 | — | Pending |
-| ECFG-05 | — | Pending |
-| ECFG-06 | — | Pending |
-| ECFG-07 | — | Pending |
-| ECFG-08 | — | Pending |
-| OBSV-01 | — | Pending |
-| OBSV-02 | — | Pending |
-| OBSV-03 | — | Pending |
+| RINT-01 | Phase 1 | Pending |
+| RINT-02 | Phase 1 | Pending |
+| RINT-03 | Phase 1 | Pending |
+| RINT-04 | Phase 1 | Pending |
+| ECFG-01 | Phase 2 | Pending |
+| ECFG-02 | Phase 2 | Pending |
+| ECFG-03 | Phase 2 | Pending |
+| ECFG-04 | Phase 2 | Pending |
+| ECFG-05 | Phase 2 | Pending |
+| ECFG-06 | Phase 2 | Pending |
+| ECFG-07 | Phase 2 | Pending |
+| ECFG-08 | Phase 2 | Pending |
+| OBSV-01 | Phase 3 | Pending |
+| OBSV-02 | Phase 3 | Pending |
+| OBSV-03 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15 ⚠️
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-14 after initial definition*
+*Last updated: 2026-02-14 after roadmap creation*
