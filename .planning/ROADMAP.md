@@ -55,11 +55,11 @@ Plans:
   1. Each training run logs a shaped_reward metric per step that is distinct from the raw correctness_score metric
   2. Each WandB run includes the reward_shaping_strategy name in its run metadata/config, enabling filtering and grouping by strategy
   3. Training loss, accuracy, and shaped reward curves from all 5 runs are visible on the same WandB project dashboard for side-by-side comparison
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: Add shaped reward and strategy metadata to WandB logging
-- [ ] 03-02: Submit all 5 runs and validate comparison dashboard
+- [ ] 03-01-PLAN.md -- Add shaped reward metric constants, wandb.config.update() for strategy metadata, and workspace template panels
+- [ ] 03-02-PLAN.md -- Batch submission script, WANDB_PROJECT validation test, and human-verified WandB dashboard comparison
 
 ## Progress
 
