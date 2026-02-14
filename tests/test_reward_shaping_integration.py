@@ -928,3 +928,157 @@ class TestIdentityRegressionAndGradientPath:
         assert shaped[0] == pytest.approx(5.0 + 0.99 * (-0.3) - 0.0, abs=1e-6)
         # r'[1] = 0.0 + 0.99 * (-0.1*5) - (-0.1*0) = 0.0 - 0.495 = -0.495
         assert shaped[1] == pytest.approx(0.0 + 0.99 * (-0.5) - 0.0, abs=1e-6)
+
+
+# ─── Backward compatibility and config validation tests ──────────────────────
+
+
+class TestBackwardCompatibilityAndConfigValidation:
+    """Backward compatibility and config validation tests.
+
+    Verifies:
+    - No-config and empty-string configs default to identity (backward compat)
+    - Invalid strategy name fails at __init__() time (fail fast)
+    - INFO log emitted on identity default
+    - dtype preserved through write-back
+    """
+
+    def test_no_config_backward_compatible(self):
+        """No reward_shaping_strategy field produces identity behavior (backward compat)."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="verifier"),
+            MockActorOutputItem(reward=0.0, role_label="verifier"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        # No reward_shaping_strategy -- rely on default ""
+        config = DebateMetricStreamerConfig(n_rollouts_per_prompt=4)
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        # Verify identity shaper is used
+        assert streamer._reward_shaper.name == "identity"
+
+        result_items, _ = streamer.get()
+
+        # Rewards should be unchanged (identity passthrough)
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+
+    def test_empty_string_strategy_uses_identity(self):
+        """Explicit empty string reward_shaping_strategy uses identity."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=3.0, role_label="solver"),
+            MockActorOutputItem(reward=7.0, role_label="solver"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=2,
+            reward_shaping_strategy="",
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        assert streamer._reward_shaper.name == "identity"
+
+        result_items, _ = streamer.get()
+        assert result_items[0].data["rewards"].item() == pytest.approx(3.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(7.0)
+
+    def test_invalid_strategy_name_fails_at_init(self):
+        """Invalid strategy name raises error at __init__() time, not at get() time.
+
+        Per locked decision: fail fast at config load time (which is __init__() for
+        DebateMetricStreamer, since __init__ calls create_reward_strategy()).
+        """
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        config = DebateMetricStreamerConfig(
+            reward_shaping_strategy="nonexistent_strategy",
+            n_rollouts_per_prompt=4,
+        )
+        upstream = MockUpstreamStreamer([], {})
+
+        # Error must occur at __init__() time, NOT during get()
+        with pytest.raises((KeyError, ValueError), match="nonexistent_strategy"):
+            DebateMetricStreamer(config, upstream, MagicMock())
+        # get() is never called -- error is at init time
+
+    def test_info_log_on_identity_default(self, caplog):
+        """INFO log emitted when identity strategy is initialized."""
+        import logging
+
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [MockActorOutputItem(reward=5.0, role_label="solver")]
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(n_rollouts_per_prompt=1)
+
+        with caplog.at_level(logging.INFO, logger="src.training.wandb_enrichment.debate_streamer"):
+            DebateMetricStreamer(config, upstream, MagicMock())
+
+        # Verify the initialization log message is present
+        assert any(
+            "identity" in record.message and "initialized reward shaping strategy" in record.message
+            for record in caplog.records
+        ), (
+            f"Expected INFO log about identity strategy initialization. "
+            f"Got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_shaped_rewards_dtype_preserved(self):
+        """Shaped rewards preserve original float32 dtype through write-back."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        # Create items with explicit float32 rewards
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+        ]
+        # Manually set dtype to float32
+        for item in items:
+            item.data["rewards"] = np.array(item.data["rewards"].item(), dtype=np.float32)
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=8,
+            reward_shaping_strategy="coma_advantage",
+            reward_shaping_params={"n_rollouts_per_prompt": 8},
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # After shaping, dtype should still be float32
+        for idx, item in enumerate(result_items):
+            assert item.data["rewards"].dtype == np.float32, (
+                f"Item {idx} dtype is {item.data['rewards'].dtype}, expected float32"
+            )
