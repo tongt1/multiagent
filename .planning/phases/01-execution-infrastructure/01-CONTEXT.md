@@ -16,9 +16,9 @@ Set up and run the CooperBench benchmark with Command A across 3 experimental se
 ### CLI Integration
 - Use the upstream `cooperbench` CLI directly via subprocess — NOT the custom wrapper in `src/evaluation/cooperbench/pipeline.py`
 - Model string: `command-a-03-2025` with `COHERE_API_KEY` configured
-- Agent type: `openhands_sdk` (matches paper methodology — real tool use, file browsing, git)
+- Agent type: `mini_swe_agent` (supports Docker backend; openhands_sdk is Modal-only — resolved during research)
 - API endpoint: staging (`stg.api.cohere.com`) — current codebase default
-- Command pattern: `cooperbench run -m command-a-03-2025 -a openhands_sdk -s lite --setting {solo|coop} [--no-messaging]`
+- Command pattern: `cooperbench run -m command-a-03-2025 -a mini_swe_agent -s lite --setting {solo|coop} [--no-messaging] --backend docker`
 
 ### Docker Image Strategy
 - Pull all missing images from Docker Hub (`docker pull akhatua/cooperbench-*:task{id}`)

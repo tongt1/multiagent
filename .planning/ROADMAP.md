@@ -29,7 +29,7 @@ Plans:
 2. A smoke test of 5 pairs completes end-to-end through the upstream CooperBench CLI with Docker backend, producing log directories with test results.
 3. Solo, coop-no-comm, and coop-with-comm runs on the full lite subset (100 pairs each) complete with results written to the logs directory.
 4. Infrastructure failures (Docker OOM, timeouts) are automatically retried and tagged as `infra_error`, distinguishable from genuine test failures in the output.
-5. Cumulative API cost is tracked per run and a configurable budget ceiling halts execution when reached.
+5. Cumulative API cost is tracked and reported per run (no budget ceiling — costs are monitored but do not halt execution, per user decision).
 
 ---
 

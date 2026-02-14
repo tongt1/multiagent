@@ -14,7 +14,7 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 - [ ] **EXEC-03**: Run Command A in solo mode on full lite subset (100 pairs)
 - [ ] **EXEC-04**: Run Command A in coop mode with communication on full lite subset
 - [ ] **EXEC-05**: Run Command A in coop mode without communication on full lite subset
-- [ ] **EXEC-06**: Implement cost tracking with configurable budget ceiling
+- [ ] **EXEC-06**: Implement cost tracking per run (no budget ceiling — track and report costs but don't halt execution)
 - [ ] **EXEC-07**: Implement retry policy for infrastructure failures (Docker OOM, timeouts) with infra_error tagging
 
 ### Results Collection
