@@ -9,29 +9,29 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 
 ## Current Position
 
-Phase: 1 of 3 (End-to-End Reward Integration)
-Plan: 1 of 2 in current phase
-Status: Plan 01-01 complete, ready for 01-02
-Last activity: 2026-02-14 -- Completed 01-01 (shaped reward write-back)
+Phase: 1 of 3 (End-to-End Reward Integration) -- COMPLETE
+Plan: 2 of 2 in current phase (all plans complete)
+Status: Phase 01 complete, ready for Phase 02
+Last activity: 2026-02-14 -- Completed 01-02 (identity regression + gradient-path verification)
 
-Progress: [###░░░░░░░] 17%
+Progress: [######░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 5min
-- Total execution time: 0.08 hours
+- Total plans completed: 2
+- Average duration: 5.5min
+- Total execution time: 0.18 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-end-to-end-reward-integration | 1 | 5min | 5min |
+| 01-end-to-end-reward-integration | 2 | 11min | 5.5min |
 
 **Recent Trend:**
-- Last 5 plans: 5min
-- Trend: First plan complete
+- Last 5 plans: 5min, 6min
+- Trend: Consistent ~5-6min per plan
 
 *Updated after each plan completion*
 
@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - Judge items always receive 0.0 reward regardless of strategy type
 - Missing role in per-role dict falls back to raw reward
 - Original dtype preserved via np.array(value, dtype=original_dtype)
+- Used torch.backward() for gradient-norm comparison per locked decisions R12/R13
+- atol=1e-6, rtol=1e-5 tolerances for identity regression per user decision
+- Invalid strategy name errors at __init__() time (fail fast), not at runtime
 
 ### Pending Todos
 
@@ -57,11 +60,12 @@ None.
 ### Blockers/Concerns
 
 - RESOLVED: Reward shaping strategies now wired into DebateMetricStreamer with write-back to item.data["rewards"]
+- RESOLVED: Identity regression and gradient-path liveness verified via 13 integration tests
 - DebateMetricStreamerConfig has reward_shaping_strategy/params fields but they are commented out in SWEEP config
-- Next: verify shaped rewards flow to GRPO/RLOO loss via gradient check (Plan 01-02)
+- Next: Phase 02 (Training Infrastructure) -- configure SWEEP config with reward shaping strategies
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 01-01-PLAN.md (shaped reward write-back)
-Resume file: .planning/phases/01-end-to-end-reward-integration/01-01-SUMMARY.md
+Stopped at: Completed 01-02-PLAN.md (identity regression + gradient-path verification). Phase 01 complete.
+Resume file: .planning/phases/01-end-to-end-reward-integration/01-02-SUMMARY.md
