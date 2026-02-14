@@ -13,7 +13,7 @@ Wire the existing reward shaping modules end-to-end through DebateMetricStreamer
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: End-to-End Reward Integration** - Shaped rewards flow through DebateMetricStreamer into GRPO/RLOO gradient computation ✓ 2026-02-14
-- [ ] **Phase 2: Experiment Configuration** - Five matched SWEEP configs ready for submission on flex queue
+- [x] **Phase 2: Experiment Configuration** - Five matched SWEEP configs ready for submission on flex queue ✓ 2026-02-14
 - [ ] **Phase 3: Observability and Comparison** - WandB captures strategy-specific metrics enabling side-by-side comparison
 
 ## Phase Details
@@ -45,7 +45,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 02-01: Create shared base constants, 5 strategy-specific SWEEP configs, and validation test suite
+- [x] 02-01: Create shared base constants, 5 strategy-specific SWEEP configs, and validation test suite ✓
 
 ### Phase 3: Observability and Comparison
 **Goal**: All 5 training runs log shaped reward metrics to WandB with strategy metadata, producing comparable learning curves in a single project
@@ -69,5 +69,5 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. End-to-End Reward Integration | 2/2 | ✓ Complete | 2026-02-14 |
-| 2. Experiment Configuration | 0/1 | Not started | - |
+| 2. Experiment Configuration | 1/1 | ✓ Complete | 2026-02-14 |
 | 3. Observability and Comparison | 0/2 | Not started | - |
