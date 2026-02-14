@@ -24,6 +24,7 @@ from configs.reward_shaping_sweep._base import (
     NUM_TRAINING_GPUS,
     NUM_SAMPLING_GPUS,
     PRIORITY_CLASS,
+    WANDB_PROJECT,
 )
 
 # ── Paths ────────────────────────────────────────────────────────────────────
@@ -438,4 +439,65 @@ class TestNoExcludedPatterns:
         source = _read_source(path)
         assert "override_mesh_for_local_gathering" not in source, (
             f"{strategy}: SmolLM (tp=1) should not include mesh override"
+        )
+
+
+# -- Test 9: All configs share WANDB_PROJECT constant (OBSV-02) ---------------
+
+class TestAllConfigsShareWandbProject:
+    """OBSV-02: All configs import and use the same WANDB_PROJECT from _base.py."""
+
+    def test_wandb_project_value(self) -> None:
+        """WANDB_PROJECT from _base.py equals 'multiagent-debate-rl'."""
+        assert WANDB_PROJECT == "multiagent-debate-rl", (
+            f"Expected WANDB_PROJECT='multiagent-debate-rl', got '{WANDB_PROJECT}'"
+        )
+
+    @pytest.mark.parametrize("strategy,path", STRATEGY_FILES.items())
+    def test_config_imports_from_base(self, strategy: str, path: Path) -> None:
+        """Each config imports from configs.reward_shaping_sweep._base."""
+        source = _read_source(path)
+        assert "from configs.reward_shaping_sweep._base import" in source, (
+            f"{strategy}: must import from _base module"
+        )
+
+    @pytest.mark.parametrize("strategy,path", STRATEGY_FILES.items())
+    def test_config_references_wandb_project(self, strategy: str, path: Path) -> None:
+        """Each config source contains WANDB_PROJECT reference."""
+        source = _read_source(path)
+        assert "WANDB_PROJECT" in source, (
+            f"{strategy}: must reference WANDB_PROJECT constant from _base"
+        )
+
+    def test_base_wandb_project_via_ast(self) -> None:
+        """_base.py defines WANDB_PROJECT as a string literal via AST inspection."""
+        base_path = _CONFIGS_DIR / "_base.py"
+        tree = _parse_ast(base_path)
+
+        wandb_project_value = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "WANDB_PROJECT":
+                        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                            wandb_project_value = node.value.value
+
+        assert wandb_project_value is not None, (
+            "_base.py: WANDB_PROJECT not found as a string literal assignment"
+        )
+        assert wandb_project_value == "multiagent-debate-rl", (
+            f"_base.py: WANDB_PROJECT={wandb_project_value!r}, expected 'multiagent-debate-rl'"
+        )
+
+    @pytest.mark.parametrize("strategy,path", STRATEGY_FILES.items())
+    def test_all_configs_share_wandb_project(self, strategy: str, path: Path) -> None:
+        """Each config uses the shared WANDB_PROJECT constant (not a hardcoded string)."""
+        source = _read_source(path)
+        # Must import WANDB_PROJECT from _base
+        assert "WANDB_PROJECT" in source, (
+            f"{strategy}: must use WANDB_PROJECT constant"
+        )
+        # Must use it in wandb_project= assignment (not a hardcoded string)
+        assert "wandb_project=WANDB_PROJECT" in source, (
+            f"{strategy}: must use wandb_project=WANDB_PROJECT (not hardcoded string)"
         )
