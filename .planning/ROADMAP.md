@@ -42,10 +42,10 @@ Plans:
   2. Diffing any two configs shows differences only in reward_shaping_strategy and reward_shaping_params fields -- all other hyperparameters, data paths, queue settings, and model configs are identical
   3. All 5 configs target post-training flex queue with dev-low priority and reference MATH-500 online data from the existing GCS path
   4. Strategy-specific params are set correctly: potential_based uses debate_length potential with gamma=0.99, coma_advantage uses n_rollouts_per_prompt=4, reward_mixing uses alpha=0.5
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 02-01: Create base config and generate 5 strategy-specific SWEEP configs
+- [ ] 02-01: Create shared base constants, 5 strategy-specific SWEEP configs, and validation test suite
 
 ### Phase 3: Observability and Comparison
 **Goal**: All 5 training runs log shaped reward metrics to WandB with strategy metadata, producing comparable learning curves in a single project
