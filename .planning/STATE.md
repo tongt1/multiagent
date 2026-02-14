@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** All 5 reward strategies must be fully wired end-to-end so shaped rewards affect gradient updates and produce meaningful WandB comparison curves.
-**Current focus:** Phase 2 - Experiment Configuration
+**Current focus:** Phase 3 - Observability and Comparison
 
 ## Current Position
 
-Phase: 2 of 3 (Experiment Configuration) -- Plan 01 complete
-Plan: 1 of 1 in current phase (all plans complete)
-Status: Phase 02 complete, ready for Phase 03
-Last activity: 2026-02-14 -- Completed 02-01 (SWEEP config generation for 5 reward shaping strategies)
+Phase: 3 of 3 (Observability and Comparison) -- Plan 01 complete
+Plan: 1 of 2 in current phase
+Status: Plan 03-01 complete, ready for Plan 03-02
+Last activity: 2026-02-14 -- Completed 03-01 (WandB config enrichment + shaped reward workspace panels)
 
-Progress: [#########░] 66%
+Progress: [############░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5.7min
-- Total execution time: 0.28 hours
+- Total plans completed: 4
+- Average duration: 5.0min
+- Total execution time: 0.33 hours
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [#########░] 66%
 |-------|-------|-------|----------|
 | 01-end-to-end-reward-integration | 2 | 11min | 5.5min |
 | 02-experiment-configuration | 1 | 6min | 6min |
+| 03-observability-and-comparison | 1 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 6min, 6min
-- Trend: Consistent ~5-6min per plan
+- Last 5 plans: 5min, 6min, 6min, 3min
+- Trend: Accelerating, 3min for Plan 03-01
 
 *Updated after each plan completion*
 
@@ -55,6 +56,8 @@ Recent decisions affecting current work:
 - Invalid strategy name errors at __init__() time (fail fast), not at runtime
 - AST/text-based test validation for SWEEP configs (sweep module unavailable locally)
 - Shared _base.py module guarantees ECFG-06 (identical hyperparams except reward shaping)
+- Used sys.modules mock pattern for wandb tests since wandb is not installed locally
+- Placed _update_wandb_config() call after workspace init in first get() to ensure wandb.run exists
 
 ### Pending Todos
 
@@ -66,10 +69,12 @@ None.
 - RESOLVED: Identity regression and gradient-path liveness verified via 13 integration tests
 - RESOLVED: DebateMetricStreamerConfig reward_shaping_strategy/params fields now uncommented in 5 strategy-specific SWEEP configs
 - RESOLVED: All 5 configs verified identical except for reward shaping fields (85 tests, ECFG-01 through ECFG-08)
-- Next: Phase 03 (Evaluation/Comparison) -- submit runs and compare results
+- RESOLVED: Shaped reward metrics centralized as METRIC_SHAPED_REWARD_* constants, hardcoded strings replaced
+- RESOLVED: wandb.config.update() surfaces reward_shaping_strategy for WandB run filtering
+- Next: Plan 03-02 -- submit all 5 SWEEP configs and validate comparison dashboard
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 02-01-PLAN.md (SWEEP config generation). Phase 02 complete.
-Resume file: .planning/phases/02-experiment-configuration/02-01-SUMMARY.md
+Stopped at: Completed 03-01-PLAN.md (WandB config enrichment + workspace panels). Plan 03-01 complete.
+Resume file: .planning/phases/03-observability-and-comparison/03-01-SUMMARY.md
