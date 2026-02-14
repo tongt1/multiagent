@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 
 ## Current Position
 
-Phase: 3 of 3 (Observability and Comparison) -- Plan 01 complete
-Plan: 1 of 2 in current phase
-Status: Plan 03-01 complete, ready for Plan 03-02
-Last activity: 2026-02-14 -- Completed 03-01 (WandB config enrichment + shaped reward workspace panels)
+Phase: 3 of 3 (Observability and Comparison) -- Plan 02 Task 1 complete, checkpoint pending
+Plan: 2 of 2 in current phase
+Status: Plan 03-02 Task 1 complete, Task 2 awaiting human verification (checkpoint:human-verify)
+Last activity: 2026-02-14 -- Completed 03-02 Task 1 (batch submission script + WANDB_PROJECT tests)
 
-Progress: [############░░] 80%
+Progress: [#############░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 5.0min
-- Total execution time: 0.33 hours
+- Total plans completed: 4 (03-02 Task 1 done, checkpoint pending)
+- Average duration: 4.4min
+- Total execution time: 0.37 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [############░░] 80%
 |-------|-------|-------|----------|
 | 01-end-to-end-reward-integration | 2 | 11min | 5.5min |
 | 02-experiment-configuration | 1 | 6min | 6min |
-| 03-observability-and-comparison | 1 | 3min | 3min |
+| 03-observability-and-comparison | 1+1T1 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 6min, 6min, 3min
-- Trend: Accelerating, 3min for Plan 03-01
+- Last 5 plans: 5min, 6min, 6min, 3min, 2min
+- Trend: Accelerating, 2min for Plan 03-02 Task 1
 
 *Updated after each plan completion*
 
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - Shared _base.py module guarantees ECFG-06 (identical hyperparams except reward shaping)
 - Used sys.modules mock pattern for wandb tests since wandb is not installed locally
 - Placed _update_wandb_config() call after workspace init in first get() to ensure wandb.run exists
+- Used mutually exclusive argparse group for --dry-run/--submit/--validate to prevent ambiguous invocations
+- Deferred wandb import to validate_runs() since wandb not installed locally
 
 ### Pending Todos
 
@@ -71,10 +73,12 @@ None.
 - RESOLVED: All 5 configs verified identical except for reward shaping fields (85 tests, ECFG-01 through ECFG-08)
 - RESOLVED: Shaped reward metrics centralized as METRIC_SHAPED_REWARD_* constants, hardcoded strings replaced
 - RESOLVED: wandb.config.update() surfaces reward_shaping_strategy for WandB run filtering
-- Next: Plan 03-02 -- submit all 5 SWEEP configs and validate comparison dashboard
+- RESOLVED: Batch submission script created with --dry-run, --submit, --validate modes
+- RESOLVED: All 5 configs share WANDB_PROJECT constant (12 additional tests, 102 total)
+- CHECKPOINT: Plan 03-02 Task 2 -- user must submit all 5 runs and verify WandB dashboard
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 03-01-PLAN.md (WandB config enrichment + workspace panels). Plan 03-01 complete.
-Resume file: .planning/phases/03-observability-and-comparison/03-01-SUMMARY.md
+Stopped at: Completed 03-02-PLAN.md Task 1 (batch submission script + WANDB_PROJECT tests). Checkpoint pending for Task 2 (human-verify).
+Resume file: .planning/phases/03-observability-and-comparison/03-02-SUMMARY.md
