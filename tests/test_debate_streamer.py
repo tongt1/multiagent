@@ -406,3 +406,161 @@ def test_debug_data_error_does_not_crash():
 
         # Verify the function WAS called (attempted) but error was caught
         assert mock_write.call_count == 1
+
+
+# ─── Shaped reward write-back tests ───────────────────────────────────────────
+
+
+def test_shaped_rewards_written_to_items_identity():
+    """Identity strategy: item.data['rewards'] values remain unchanged after get()."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(n_rollouts_per_prompt=4)
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    assert streamer._reward_shaper.name == "identity"
+
+    result_items, _ = streamer.get()
+
+    # Identity is passthrough: rewards should be unchanged
+    assert np.isclose(result_items[0].data["rewards"].item(), 5.0)
+    assert np.isclose(result_items[1].data["rewards"].item(), 0.0)
+    assert np.isclose(result_items[2].data["rewards"].item(), 5.0)
+    assert np.isclose(result_items[3].data["rewards"].item(), 0.0)
+
+
+def test_shaped_rewards_written_to_items_global_strategy():
+    """Global ndarray strategy (potential_based): write-back path works."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=2,
+        reward_shaping_strategy="potential_based",
+        reward_shaping_params={"gamma": 0.99, "potential_type": "zero"},
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    result_items, _ = streamer.get()
+
+    # With zero potential, shaped equals original (gamma*0 - 0 = 0)
+    assert np.isclose(result_items[0].data["rewards"].item(), 5.0)
+    assert np.isclose(result_items[1].data["rewards"].item(), 0.0)
+
+
+def test_shaped_rewards_written_to_items_per_role_strategy():
+    """Per-role dict strategy (coma_advantage): items get role-specific shaped values."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+        MockActorOutputItem(reward=5.0, role_label="verifier"),
+        MockActorOutputItem(reward=0.0, role_label="verifier"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=4,
+        reward_shaping_strategy="coma_advantage",
+        reward_shaping_params={"n_rollouts_per_prompt": 4},
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    result_items, _ = streamer.get()
+
+    # COMA with 4 rollouts per prompt, mean=2.5, advantages=[2.5, -2.5, 2.5, -2.5]
+    # Solver items (indices 0,1) get solver advantage values
+    assert result_items[0].data["rewards"].item() == pytest.approx(2.5)
+    assert result_items[1].data["rewards"].item() == pytest.approx(-2.5)
+    # Verifier items (indices 2,3) get verifier advantage values
+    assert result_items[2].data["rewards"].item() == pytest.approx(2.5)
+    assert result_items[3].data["rewards"].item() == pytest.approx(-2.5)
+
+
+def test_judge_items_get_zero_reward():
+    """Judge items get zero reward regardless of strategy."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=5.0, role_label="verifier"),
+        MockActorOutputItem(reward=5.0, role_label="judge"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=3,
+        reward_shaping_strategy="difference_rewards",
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    result_items, _ = streamer.get()
+
+    # Judge item should be zero regardless of strategy
+    assert result_items[2].data["rewards"].item() == pytest.approx(0.0)
+    # Solver and verifier: difference_rewards without metadata falls back to raw
+    assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+    assert result_items[1].data["rewards"].item() == pytest.approx(5.0)
+
+
+def test_unshaped_metrics_unchanged_after_mutation():
+    """Unshaped debate metrics use original raw rewards, not mutated values."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=0.0, role_label="solver"),
+    ]
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=4,
+        reward_shaping_strategy="coma_advantage",
+        reward_shaping_params={"n_rollouts_per_prompt": 4},
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    _, result_metrics = streamer.get()
+
+    # Unshaped debate/reward/solver should be mean of ORIGINAL raw rewards: (5+0+5+0)/4 = 2.5
+    assert result_metrics[METRIC_REWARD_SOLVER] == pytest.approx(2.5)
+
+    # Shaped reward metrics should reflect COMA advantage: mean of [2.5, -2.5, 2.5, -2.5] = 0.0
+    # (COMA advantages are zero-mean by construction)
+    assert result_metrics["debate/shaped_reward/mean"] == pytest.approx(0.0)
+
+
+def test_reward_mutation_fallback_on_missing_role():
+    """Items with unknown role fall back to raw reward value."""
+    items = [
+        MockActorOutputItem(reward=5.0, role_label="solver"),
+        MockActorOutputItem(reward=3.0, role_label="solver"),
+    ]
+    # Override second item's role to a custom unknown role
+    items[1].metadata["math_debate/reward_metrics"]["role_label"] = "custom_role"
+
+    upstream = MockUpstreamStreamer(items, {})
+    config = DebateMetricStreamerConfig(
+        n_rollouts_per_prompt=2,
+        reward_shaping_strategy="difference_rewards",
+    )
+    metrics_collector = MagicMock()
+
+    streamer = DebateMetricStreamer(config, upstream, metrics_collector)
+    result_items, _ = streamer.get()
+
+    # Solver item: difference_rewards without metadata falls back to raw
+    assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+    # Custom role: not in shaped dict, should fall back to raw reward (3.0)
+    assert result_items[1].data["rewards"].item() == pytest.approx(3.0)

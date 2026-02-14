@@ -544,3 +544,68 @@ class TestDebateMetricStreamerRewardShaping:
         assert "debate/shaped_reward/judge" in metrics
         assert "debate/shaped_reward/mean" in metrics
         assert metrics["debate/shaped_reward/strategy_active"] == 1.0
+
+    def test_reward_mixing_mutates_item_rewards(self):
+        """reward_mixing strategy writes shaped values back to item.data['rewards']."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="verifier"),
+            MockActorOutputItem(reward=0.0, role_label="verifier"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=4,
+            reward_shaping_strategy="reward_mixing",
+            reward_shaping_params={"alpha": 0.5},
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # reward_mixing without metadata: local falls back to G, so r = 0.5*G + 0.5*G = G
+        # Shaped equals raw, but write-back still happens (type-safe)
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+        # Verify dtype preserved
+        assert result_items[0].data["rewards"].dtype == np.float64
+
+    def test_difference_rewards_mutates_item_rewards(self):
+        """difference_rewards strategy writes shaped values back to item.data['rewards']."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=4,
+            reward_shaping_strategy="difference_rewards",
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # difference_rewards without metadata falls back to raw reward copy
+        # Each item's data["rewards"] should be the solver's difference reward
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+        # Verify dtype preserved
+        assert result_items[0].data["rewards"].dtype == np.float64
