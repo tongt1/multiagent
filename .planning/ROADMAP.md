@@ -17,6 +17,13 @@ Reproduce Figures 4, 5, and 6 from the CooperBench paper (arXiv:2601.13295) usin
 
 **Requirements:** EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06, EXEC-07
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md -- Install cooperbench CLI, pull/verify all 26 Docker images, configure environment
+- [ ] 01-02-PLAN.md -- Create orchestrator script with retry logic, run smoke test (5 pairs)
+- [ ] 01-03-PLAN.md -- Run full benchmark: solo, coop-comm, coop-nocomm (100 pairs each)
+
 **Success Criteria:**
 1. All 26 lite subset Docker images are available locally (pulled or built), verified by `docker images | grep cooperbench` showing all 26 task images.
 2. A smoke test of 5 pairs completes end-to-end through the upstream CooperBench CLI with Docker backend, producing log directories with test results.
@@ -96,7 +103,7 @@ Reproduce Figures 4, 5, and 6 from the CooperBench paper (arXiv:2601.13295) usin
 
 | Phase | Name | Status | Requirements | Plans |
 |-------|------|--------|--------------|-------|
-| 1 | Execution Infrastructure | Not Started | 7 | -- |
+| 1 | Execution Infrastructure | Planned | 7 | 3 |
 | 2 | Results Collection and Data Foundation | Not Started | 5 | -- |
 | 3 | Analysis Modules | Not Started | 10 | -- |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
