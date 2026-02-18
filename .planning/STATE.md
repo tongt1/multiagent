@@ -6,23 +6,23 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 3 complete -- Analysis Modules. Ready for Phase 4.
+**Current focus:** Phase 4 in progress -- Figure Generation and Paper Comparison.
 
 ## Current Position
 
-Phase: 3 (Analysis Modules)
-Plan: 3 of 3 in current phase (03-03 complete -- phase complete)
-Status: Phase 3 complete
-Last activity: 2026-02-18 -- Completed 03-03-PLAN.md (Figure 6 LLM-based communication error classifier)
+Phase: 4 (Figure Generation and Paper Comparison)
+Plan: 1 of 2 in current phase (04-01 complete)
+Status: Phase 4 in progress
+Last activity: 2026-02-18 -- Completed 04-01-PLAN.md (Paper baselines module + Figure 4 generation)
 
-Progress: [######....] 60% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 = 9 plans complete)
+Progress: [######....] 67% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4: 1/2 = 10 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 50 min
-- Total execution time: 7 hours 30 min
+- Total plans completed: 10
+- Average duration: 45 min
+- Total execution time: 7 hours 32 min
 
 **By Phase:**
 
@@ -31,6 +31,7 @@ Progress: [######....] 60% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 = 9 plans
 | 1 | 3/3 | 300 min | 100 min |
 | 2 | 3/3 | 218 min | 73 min |
 | 3 | 3/3 | 12 min | 4 min |
+| 4 | 1/2 | 2 min | 2 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
@@ -42,6 +43,7 @@ Progress: [######....] 60% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 = 9 plans
 - 03-01: 3 min (2 tasks, 2 files)
 - 03-02: 3 min (2 tasks, 2 files)
 - 03-03: 6 min (2 tasks, 2 files)
+- 04-01: 2 min (2 tasks, 4 files)
 
 *Updated after each plan completion*
 
@@ -80,6 +82,9 @@ Recent decisions affecting current work:
 - NEW LLM classifier for Figure 6 taxonomy (not cooperbench-eval) -- message-quality errors, not coordination failures
 - Command A via staging endpoint for taxonomy classification (same key as benchmark runs)
 - Temperature 0.0 for deterministic classification results
+- Paper baselines centralized in single PAPER_BASELINES dict for all 3 figures
+- CI bands rendered as narrow fill_between rectangles at discrete bucket centers (not continuous) -- honest sparse data representation
+- AUC/retention comparison shown as text annotation box, not reference lines on y-axis -- AUC is area under curve, not a point value
 
 ### Pending Todos
 
@@ -171,13 +176,23 @@ Total: 77 errors across 100 transcripts, 51 with errors, 0 API failures
 Dominant: Spammy categories (C4a+C4b) = 74.0% of all errors
 Data files: `scripts/analyze_fig6.py`, `data/fig6_metrics.json`
 
+### Figure 4 Generation (Phase 4 Output)
+
+Publication-quality Figure 4 generated as PDF (TrueType fonts) and PNG (300 DPI):
+- 3 populated bucket centers (0.35, 0.65, 0.95) with scatter+line markers
+- CI shaded bands via fill_between at each data point
+- Unpopulated bucket regions shaded light gray
+- Paper baseline comparison: our solo AUC=0.150 vs paper 0.338, coop AUC=0.000 vs 0.200
+- Output files: `figures/fig4_difficulty_curves.{pdf,png}`
+- Script: `scripts/generate_fig4.py`, shared module: `scripts/paper_baselines.py`
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 03-03-PLAN.md (Figure 6 LLM-based communication error classifier) -- Phase 3 complete
+Stopped at: Completed 04-01-PLAN.md (Paper baselines module + Figure 4 generation)
 Resume file: None
-Next action: Begin Phase 4 (Figure Generation)
+Next action: Execute 04-02-PLAN.md (Figures 5 and 6)
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (03-03 complete, Phase 3 complete)*
+*Last updated: 2026-02-18 (04-01 complete, Phase 4 in progress)*

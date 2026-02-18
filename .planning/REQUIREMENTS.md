@@ -31,7 +31,7 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 - [x] **FIG4-04**: Compute Wilson 95% confidence intervals for all rates
 - [x] **FIG4-05**: Compute AUC via trapezoidal integration for solo and coop curves
 - [x] **FIG4-06**: Compute retention metric (AUC_coop / AUC_solo)
-- [ ] **FIG4-07**: Generate Figure 4 with CI shaded bands, publication-quality PDF/PNG at 300+ DPI
+- [x] **FIG4-07**: Generate Figure 4 with CI shaded bands, publication-quality PDF/PNG at 300+ DPI
 
 ### Figure 5: Communication Effects
 
@@ -56,7 +56,7 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Paper Comparison
 
-- [ ] **COMP-01**: Overlay paper's published baseline numbers on Figures 4, 5, 6 for direct visual comparison
+- [x] **COMP-01**: Overlay paper's published baseline numbers on Figures 4, 5, 6 for direct visual comparison
 
 ## v2 Requirements
 
@@ -107,7 +107,7 @@ Deferred to future work. Tracked but not in current roadmap.
 | FIG4-04 | Phase 3 | Complete |
 | FIG4-05 | Phase 3 | Complete |
 | FIG4-06 | Phase 3 | Complete |
-| FIG4-07 | Phase 4 | Pending |
+| FIG4-07 | Phase 4 | Complete |
 | FIG5-01 | Phase 3 | Complete |
 | FIG5-02 | Phase 3 | Complete |
 | FIG5-03 | Phase 3 | Complete |
@@ -120,7 +120,7 @@ Deferred to future work. Tracked but not in current roadmap.
 | QUAL-02 | Phase 5 | Pending |
 | QUAL-03 | Phase 5 | Pending |
 | QUAL-04 | Phase 5 | Pending |
-| COMP-01 | Phase 4 | Pending |
+| COMP-01 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 30 total
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 03-02-PLAN.md completion (FIG5-01, FIG5-02, FIG5-03, FIG5-04 complete)*
+*Last updated: 2026-02-18 after 04-01-PLAN.md completion (FIG4-07, COMP-01 complete)*
