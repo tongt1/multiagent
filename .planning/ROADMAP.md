@@ -93,7 +93,7 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md -- Create paper baselines module and generate Figure 4 (difficulty curves with CI bands)
-- [ ] 04-02-PLAN.md -- Generate Figure 5 (communication 3-panel) and Figure 6 (error taxonomy bar chart)
+- [x] 04-02-PLAN.md -- Generate Figure 5 (communication 3-panel) and Figure 6 (error taxonomy bar chart)
 
 **Success Criteria:**
 1. Figure 4 is saved as PDF/PNG at 300+ DPI showing difficulty-stratified success curves for solo and coop settings, with Wilson CI shaded bands, AUC values annotated, and retention metric displayed.
@@ -126,11 +126,11 @@ Plans:
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
 | 3 | Analysis Modules | Complete | 10 | 3/3 |
-| 4 | Figure Generation and Paper Comparison | In Progress | 4 | 1/2 |
+| 4 | Figure Generation and Paper Comparison | Complete | 4 | 2/2 |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
-**Total:** 24/30 requirements complete
+**Total:** 27/30 requirements complete
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-18 (04-01 complete: Figure 4 generated)*
+*Last updated: 2026-02-18 (04-02 complete: Phase 4 done, all 3 figures generated)*

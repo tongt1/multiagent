@@ -6,23 +6,23 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 4 in progress -- Figure Generation and Paper Comparison.
+**Current focus:** Phase 4 complete -- Figure Generation and Paper Comparison done. Ready for Phase 5.
 
 ## Current Position
 
 Phase: 4 (Figure Generation and Paper Comparison)
-Plan: 1 of 2 in current phase (04-01 complete)
-Status: Phase 4 in progress
-Last activity: 2026-02-18 -- Completed 04-01-PLAN.md (Paper baselines module + Figure 4 generation)
+Plan: 2 of 2 in current phase (04-02 complete -- phase done)
+Status: Phase 4 complete
+Last activity: 2026-02-18 -- Completed 04-02-PLAN.md (Figures 5 and 6 generation)
 
-Progress: [######....] 67% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4: 1/2 = 10 plans complete)
+Progress: [#######...] 73% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4: 2/2 = 11 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 45 min
-- Total execution time: 7 hours 32 min
+- Total plans completed: 11
+- Average duration: 41 min
+- Total execution time: 7 hours 34 min
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: [######....] 67% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4
 | 1 | 3/3 | 300 min | 100 min |
 | 2 | 3/3 | 218 min | 73 min |
 | 3 | 3/3 | 12 min | 4 min |
-| 4 | 1/2 | 2 min | 2 min |
+| 4 | 2/2 | 4 min | 2 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
@@ -44,6 +44,7 @@ Progress: [######....] 67% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4
 - 03-02: 3 min (2 tasks, 2 files)
 - 03-03: 6 min (2 tasks, 2 files)
 - 04-01: 2 min (2 tasks, 4 files)
+- 04-02: 2 min (2 tasks, 6 files)
 
 *Updated after each plan completion*
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - Paper baselines centralized in single PAPER_BASELINES dict for all 3 figures
 - CI bands rendered as narrow fill_between rectangles at discrete bucket centers (not continuous) -- honest sparse data representation
 - AUC/retention comparison shown as text annotation box, not reference lines on y-axis -- AUC is area under curve, not a point value
+- Figure 6 categories ordered by paper grouping (C4a,C4b,C1a,C1b,C2,C3b) for visual clustering of bracket groups
+- Grouping brackets drawn below x-axis with colored lines and centered labels for paper category mapping
+- Paper baselines shown as dashed reference lines (Fig 5 panel b) and annotation box (Fig 6) -- different visualization for different data types
 
 ### Pending Todos
 
@@ -186,13 +190,32 @@ Publication-quality Figure 4 generated as PDF (TrueType fonts) and PNG (300 DPI)
 - Output files: `figures/fig4_difficulty_curves.{pdf,png}`
 - Script: `scripts/generate_fig4.py`, shared module: `scripts/paper_baselines.py`
 
+### Figure 5 Generation (Phase 4 Output)
+
+Publication-quality Figure 5 generated as PDF (TrueType fonts) and PNG (300 DPI):
+- 3-panel layout: (a) success rates with Wilson CI error bars, (b) merge conflict rates, (c) speech acts
+- Panel (a): 0% in both settings, CI upper bounds annotated (3.8% comm, 4.2% nocomm)
+- Panel (b): 41% comm vs 55% nocomm with paper planning baselines (29.4% with, 51.5% without)
+- Panel (c): plan 46.7%, question 26.0%, update 10.5%, other 16.8%; overhead 22.8% (paper ~20%)
+- Output files: `figures/fig5_communication.{pdf,png}`
+- Script: `scripts/generate_fig5.py`
+
+### Figure 6 Generation (Phase 4 Output)
+
+Publication-quality Figure 6 generated as PDF (TrueType fonts) and PNG (300 DPI):
+- 6-category bar chart with count+pct annotations (C4a=41.6%, C4b=32.5%, C1a=11.7%, C1b=9.1%, C2=1.3%, C3b=3.9%)
+- Colored grouping brackets mapping to paper's 3 categories: Repetition 74.0%, Unresponsiveness 20.8%, Hallucination 5.2%
+- Annotation box with aggregated paper category mapping
+- Output files: `figures/fig6_error_taxonomy.{pdf,png}`
+- Script: `scripts/generate_fig6.py`
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 04-01-PLAN.md (Paper baselines module + Figure 4 generation)
+Stopped at: Completed 04-02-PLAN.md (Figures 5 and 6 generation -- Phase 4 complete)
 Resume file: None
-Next action: Execute 04-02-PLAN.md (Figures 5 and 6)
+Next action: Phase 5 (Qualitative Transcript Analysis) if needed
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (04-01 complete, Phase 4 in progress)*
+*Last updated: 2026-02-18 (04-02 complete, Phase 4 done)*

@@ -39,13 +39,13 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 - [x] **FIG5-02**: Compute merge conflict rates with and without communication
 - [x] **FIG5-03**: Classify agent messages into speech act types (plan/question/update)
 - [x] **FIG5-04**: Compute communication overhead as percentage of total action budget
-- [ ] **FIG5-05**: Generate Figure 5 as 3-panel plot: (a) success rates, (b) conflict rates, (c) overhead breakdown
+- [x] **FIG5-05**: Generate Figure 5 as 3-panel plot: (a) success rates, (b) conflict rates, (c) overhead breakdown
 
 ### Figure 6: Communication Error Taxonomy
 
 - [x] **FIG6-01**: Implement LLM-based communication error classifier using paper's taxonomy prompt (C1a unanswered no-reply, C1b unanswered ignored, C2 non-answer/vague, C3b incorrect claim corrected, C4a spammy same info, C4b spammy near-duplicate blocks)
 - [x] **FIG6-02**: Run classifier on all coop-with-comm transcripts
-- [ ] **FIG6-03**: Generate Figure 6 as error frequency bar chart
+- [x] **FIG6-03**: Generate Figure 6 as error frequency bar chart
 
 ### Qualitative Analysis
 
@@ -112,10 +112,10 @@ Deferred to future work. Tracked but not in current roadmap.
 | FIG5-02 | Phase 3 | Complete |
 | FIG5-03 | Phase 3 | Complete |
 | FIG5-04 | Phase 3 | Complete |
-| FIG5-05 | Phase 4 | Pending |
+| FIG5-05 | Phase 4 | Complete |
 | FIG6-01 | Phase 3 | Complete |
 | FIG6-02 | Phase 3 | Complete |
-| FIG6-03 | Phase 4 | Pending |
+| FIG6-03 | Phase 4 | Complete |
 | QUAL-01 | Phase 5 | Pending |
 | QUAL-02 | Phase 5 | Pending |
 | QUAL-03 | Phase 5 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 04-01-PLAN.md completion (FIG4-07, COMP-01 complete)*
+*Last updated: 2026-02-18 after 04-02-PLAN.md completion (FIG5-05, FIG6-03 complete -- Phase 4 done)*
