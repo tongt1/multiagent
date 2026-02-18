@@ -41,7 +41,7 @@ Plans:
 
 **Requirements:** DATA-01, DATA-02, DATA-03, FIG4-01, FIG4-02
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md -- Fix Docker eval backend entrypoint bug, run evaluation on all 300 existing benchmark results
@@ -116,7 +116,7 @@ Plans:
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
-**Total:** 14/30 requirements complete
+**Total:** 12/30 requirements complete
 
 ---
 *Roadmap created: 2026-02-14*
