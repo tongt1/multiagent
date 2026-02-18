@@ -9,11 +9,11 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Execution Infrastructure
 
-- [x] **EXEC-01**: Pull/build all Docker images required for lite subset (26 tasks, 8 currently missing)
+- [ ] **EXEC-01**: Pull/build all Docker images required for lite subset (26 tasks, 8 currently missing)
 - [x] **EXEC-02**: Verify upstream CooperBench CLI works end-to-end with Docker backend on a smoke test (5 pairs)
-- [x] **EXEC-03**: Run Command A in solo mode on full lite subset (100 pairs)
-- [x] **EXEC-04**: Run Command A in coop mode with communication on full lite subset
-- [x] **EXEC-05**: Run Command A in coop mode without communication on full lite subset
+- [ ] **EXEC-03**: Run Command A in solo mode on full lite subset (100 pairs)
+- [ ] **EXEC-04**: Run Command A in coop mode with communication on full lite subset
+- [ ] **EXEC-05**: Run Command A in coop mode without communication on full lite subset
 - [x] **EXEC-06**: Implement cost tracking per run (no budget ceiling — track and report costs but don't halt execution)
 - [x] **EXEC-07**: Implement retry policy for infrastructure failures (Docker OOM, timeouts) with infra_error tagging
 
@@ -91,11 +91,11 @@ Deferred to future work. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXEC-01 | Phase 1 | Complete |
+| EXEC-01 | Phase 1 | Pending |
 | EXEC-02 | Phase 1 | Complete |
-| EXEC-03 | Phase 1 | Complete |
-| EXEC-04 | Phase 1 | Complete |
-| EXEC-05 | Phase 1 | Complete |
+| EXEC-03 | Phase 1 | Pending |
+| EXEC-04 | Phase 1 | Pending |
+| EXEC-05 | Phase 1 | Pending |
 | EXEC-06 | Phase 1 | Complete |
 | EXEC-07 | Phase 1 | Complete |
 | DATA-01 | Phase 2 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 01-03-PLAN.md completion (Phase 1 complete)*
+*Last updated: 2026-02-18 after 01-02-PLAN.md completion*
