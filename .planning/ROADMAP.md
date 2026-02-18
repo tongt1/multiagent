@@ -89,7 +89,7 @@ Plans:
 
 **Requirements:** FIG4-07, FIG5-05, FIG6-03, COMP-01
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md -- Create paper baselines module and generate Figure 4 (difficulty curves with CI bands)
