@@ -41,6 +41,13 @@ Plans:
 
 **Requirements:** DATA-01, DATA-02, DATA-03, FIG4-01, FIG4-02
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md -- Fix Docker eval backend entrypoint bug, run evaluation on all 300 existing benchmark results
+- [ ] 02-02-PLAN.md -- Run 2 additional solo seeds (3 total) and evaluate them for difficulty scoring
+- [ ] 02-03-PLAN.md -- Build collection script, compute difficulty scores, produce unified data/results.json
+
 **Success Criteria:**
 1. A unified JSON results store exists containing all benchmark outcomes from all three settings, with each record including task ID, setting, merge outcome, test outcome, and status (pass/fail/infra_error).
 2. Merge outcomes and test outcomes are tracked as independent dimensions: `{merge_clean, merge_union, merge_failed} x {tests_pass, tests_fail}`.
@@ -104,7 +111,7 @@ Plans:
 | Phase | Name | Status | Requirements | Plans |
 |-------|------|--------|--------------|-------|
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
-| 2 | Results Collection and Data Foundation | Not Started | 5 | -- |
+| 2 | Results Collection and Data Foundation | In Progress | 5 | 0/3 |
 | 3 | Analysis Modules | Not Started | 10 | -- |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
