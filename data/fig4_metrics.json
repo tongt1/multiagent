@@ -1,0 +1,123 @@
+{
+  "buckets": [
+    {
+      "bucket": 3,
+      "center": 0.35,
+      "solo": {
+        "successes": 1,
+        "total": 1,
+        "rate": 1.0,
+        "ci_lower": 0.206543,
+        "ci_upper": 1.0
+      },
+      "coop_comm": {
+        "successes": 0,
+        "total": 1,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.793457
+      },
+      "coop_nocomm": {
+        "successes": 0,
+        "total": 1,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.793457
+      }
+    },
+    {
+      "bucket": 6,
+      "center": 0.65,
+      "solo": {
+        "successes": 0,
+        "total": 1,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.793457
+      },
+      "coop_comm": {
+        "successes": 0,
+        "total": 1,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.793457
+      },
+      "coop_nocomm": {
+        "successes": 0,
+        "total": 1,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.793457
+      }
+    },
+    {
+      "bucket": 9,
+      "center": 0.95,
+      "solo": {
+        "successes": 0,
+        "total": 95,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.038866
+      },
+      "coop_comm": {
+        "successes": 0,
+        "total": 94,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.039263
+      },
+      "coop_nocomm": {
+        "successes": 0,
+        "total": 86,
+        "rate": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.04276
+      }
+    }
+  ],
+  "auc": {
+    "solo": {
+      "value": 0.15,
+      "n_points": 3,
+      "x_range": [
+        0.35,
+        0.95
+      ]
+    },
+    "coop_comm": {
+      "value": 0.0,
+      "n_points": 3,
+      "x_range": [
+        0.35,
+        0.95
+      ]
+    },
+    "coop_nocomm": {
+      "value": 0.0,
+      "n_points": 3,
+      "x_range": [
+        0.35,
+        0.95
+      ]
+    }
+  },
+  "retention": {
+    "coop_comm": 0.0,
+    "coop_nocomm": 0.0
+  },
+  "metadata": {
+    "input_file": "/mnt/data/terry/home/cooperbench-repro/data/results.json",
+    "total_records": 500,
+    "records_used": 473,
+    "solo_seed": 0,
+    "solo_seed0_records": 97,
+    "populated_buckets": [
+      3,
+      6,
+      9
+    ],
+    "total_buckets": 10,
+    "sparsity_warning": "Only 3 of 10 buckets populated; AUC is a rough approximation"
+  }
+}
