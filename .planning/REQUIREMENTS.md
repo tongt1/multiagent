@@ -19,14 +19,14 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Results Collection
 
-- [ ] **DATA-01**: Normalize upstream log directory structure into unified JSON results store
+- [x] **DATA-01**: Normalize upstream log directory structure into unified JSON results store
 - [x] **DATA-02**: Distinguish infrastructure errors from genuine test failures in results
 - [x] **DATA-03**: Track merge outcomes as separate dimension from test outcomes (merge_clean/merge_union/merge_failed x tests_pass/tests_fail)
 
 ### Figure 4: Difficulty-Stratified Success Curves
 
-- [ ] **FIG4-01**: Compute per-task difficulty score d(t) = 1 - Solo(t) in [0,1]
-- [ ] **FIG4-02**: Partition tasks into 10 equal-width buckets over [0,1]
+- [x] **FIG4-01**: Compute per-task difficulty score d(t) = 1 - Solo(t) in [0,1]
+- [x] **FIG4-02**: Partition tasks into 10 equal-width buckets over [0,1]
 - [ ] **FIG4-03**: Compute per-bucket solo and coop success rates
 - [ ] **FIG4-04**: Compute Wilson 95% confidence intervals for all rates
 - [ ] **FIG4-05**: Compute AUC via trapezoidal integration for solo and coop curves
@@ -98,11 +98,11 @@ Deferred to future work. Tracked but not in current roadmap.
 | EXEC-05 | Phase 1 | Complete |
 | EXEC-06 | Phase 1 | Complete |
 | EXEC-07 | Phase 1 | Complete |
-| DATA-01 | Phase 2 | Pending |
+| DATA-01 | Phase 2 | Complete |
 | DATA-02 | Phase 2 | Complete |
 | DATA-03 | Phase 2 | Complete |
-| FIG4-01 | Phase 2 | Pending |
-| FIG4-02 | Phase 2 | Pending |
+| FIG4-01 | Phase 2 | Complete |
+| FIG4-02 | Phase 2 | Complete |
 | FIG4-03 | Phase 3 | Pending |
 | FIG4-04 | Phase 3 | Pending |
 | FIG4-05 | Phase 3 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 02-01-PLAN.md completion (DATA-02, DATA-03 complete)*
+*Last updated: 2026-02-18 after 02-03-PLAN.md completion (Phase 2 complete: DATA-01, DATA-02, DATA-03, FIG4-01, FIG4-02)*

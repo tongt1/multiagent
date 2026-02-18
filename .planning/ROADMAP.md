@@ -46,7 +46,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md -- Fix Docker eval backend entrypoint bug, run evaluation on all 300 existing benchmark results
 - [x] 02-02-PLAN.md -- Run 2 additional solo seeds (3 total) and evaluate them for difficulty scoring
-- [ ] 02-03-PLAN.md -- Build collection script, compute difficulty scores, produce unified data/results.json
+- [x] 02-03-PLAN.md -- Build collection script, compute difficulty scores, produce unified data/results.json
 
 **Success Criteria:**
 1. A unified JSON results store exists containing all benchmark outcomes from all three settings, with each record including task ID, setting, merge outcome, test outcome, and status (pass/fail/infra_error).
@@ -111,13 +111,13 @@ Plans:
 | Phase | Name | Status | Requirements | Plans |
 |-------|------|--------|--------------|-------|
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
-| 2 | Results Collection and Data Foundation | In Progress | 5 | 1/3 |
+| 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
 | 3 | Analysis Modules | Not Started | 10 | -- |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
-**Total:** 9/30 requirements complete
+**Total:** 14/30 requirements complete
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-18 (02-01 complete)*
+*Last updated: 2026-02-18 (02-03 complete, Phase 2 complete)*

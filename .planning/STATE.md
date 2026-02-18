@@ -6,36 +6,38 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 2 -- Results Collection and Data Foundation (Plan 1 complete, 2 remaining)
+**Current focus:** Phase 2 complete -- Results Collection and Data Foundation. Ready for Phase 3.
 
 ## Current Position
 
 Phase: 2 (Results Collection and Data Foundation)
-Plan: 1 of 3 in current phase (02-01 complete)
-Status: Phase 2 in progress
-Last activity: 2026-02-18 -- Completed 02-01-PLAN.md (eval all 300 benchmark runs)
+Plan: 3 of 3 in current phase (02-03 complete -- phase complete)
+Status: Phase 2 complete
+Last activity: 2026-02-18 -- Completed 02-03-PLAN.md (unified results collection and data store)
 
-Progress: [###.......] 27% (Phase 1: 3/3 + Phase 2: 1/3 = 4 plans complete)
+Progress: [######....] 40% (Phase 1: 3/3 + Phase 2: 3/3 = 6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 91 min
-- Total execution time: 6 hours 5 min
+- Total plans completed: 6
+- Average duration: 72 min
+- Total execution time: 7 hours 18 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 3/3 | 300 min | 100 min |
-| 2 | 1/3 | 65 min | 65 min |
+| 2 | 3/3 | 218 min | 73 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
 - 01-02: 6 min (2 tasks, 1 file)
 - 01-03: 290 min (2 tasks, 300 result files)
 - 02-01: 65 min (2 tasks, 1 code file + 303 data files)
+- 02-02: 150 min (2 tasks, 200 data files)
+- 02-03: 3 min (2 tasks, 2 files)
 
 *Updated after each plan completion*
 
@@ -61,6 +63,10 @@ Recent decisions affecting current work:
 - Redis auto-started by cooperbench for coop mode; no manual setup needed
 - Docker eval backend entrypoint override: added entrypoint="" to prevent CooperBench image runner.sh from exiting containers immediately
 - Eval_summary.json regenerated from actual eval.json files after retry pass to ensure accurate aggregate counts
+- infra_error defaults to false (field absent from all result.json files)
+- No merge_union outcomes observed: all coop merges are merge_clean (naive) or merge_failed
+- LimitsExceeded override applied to 4 records (all already both_passed=false)
+- Only 3 of 10 difficulty buckets populated (buckets 3, 6, 9) due to single-model low pass rates
 
 ### Pending Todos
 
@@ -99,13 +105,29 @@ Results location: `repos/CooperBench/logs/{command-a-solo,command-a-coop-comm,co
 
 Eval location: `repos/CooperBench/logs/{command-a-solo,command-a-coop-comm,command-a-coop-nocomm}/**/eval.json`
 
+### Unified Data Store (Phase 2 Output)
+
+| Setting | Records | Pass Rate |
+|---------|---------|-----------|
+| Solo (seed 0) | 100 | 1.0% |
+| Solo (seed 1) | 100 | 1.0% |
+| Solo (seed 2) | 100 | 1.0% |
+| Coop-Comm | 100 | 0.0% |
+| Coop-NoComm | 100 | 0.0% |
+| **Total** | **500** | |
+
+Data store: `data/results.json` (500 records, 24 fields each)
+Collection script: `scripts/collect_results.py` (rerunnable)
+Difficulty: {0.3333: 1 pair, 0.6667: 1 pair, 1.0: 98 pairs}
+Populated buckets: 3/10 (buckets 3, 6, 9)
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 02-01-PLAN.md (eval all 300 benchmark runs)
+Stopped at: Completed 02-03-PLAN.md (unified results collection and data store) -- Phase 2 complete
 Resume file: None
-Next action: Execute 02-02-PLAN.md (additional solo seeds for difficulty scoring)
+Next action: Begin Phase 3 (Analysis Modules)
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (02-01 complete)*
+*Last updated: 2026-02-18 (02-03 complete, Phase 2 complete)*
