@@ -89,6 +89,12 @@ Plans:
 
 **Requirements:** FIG4-07, FIG5-05, FIG6-03, COMP-01
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Create paper baselines module and generate Figure 4 (difficulty curves with CI bands)
+- [ ] 04-02-PLAN.md -- Generate Figure 5 (communication 3-panel) and Figure 6 (error taxonomy bar chart)
+
 **Success Criteria:**
 1. Figure 4 is saved as PDF/PNG at 300+ DPI showing difficulty-stratified success curves for solo and coop settings, with Wilson CI shaded bands, AUC values annotated, and retention metric displayed.
 2. Figure 5 is saved as a 3-panel plot: (a) comm vs no-comm success rates, (b) merge conflict rates with/without communication, (c) communication overhead breakdown by speech act type.
@@ -120,7 +126,7 @@ Plans:
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
 | 3 | Analysis Modules | Complete | 10 | 3/3 |
-| 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
+| 4 | Figure Generation and Paper Comparison | Planned | 4 | 0/2 |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
 **Total:** 22/30 requirements complete
