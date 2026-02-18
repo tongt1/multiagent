@@ -20,8 +20,8 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 ### Results Collection
 
 - [ ] **DATA-01**: Normalize upstream log directory structure into unified JSON results store
-- [ ] **DATA-02**: Distinguish infrastructure errors from genuine test failures in results
-- [ ] **DATA-03**: Track merge outcomes as separate dimension from test outcomes (merge_clean/merge_union/merge_failed x tests_pass/tests_fail)
+- [x] **DATA-02**: Distinguish infrastructure errors from genuine test failures in results
+- [x] **DATA-03**: Track merge outcomes as separate dimension from test outcomes (merge_clean/merge_union/merge_failed x tests_pass/tests_fail)
 
 ### Figure 4: Difficulty-Stratified Success Curves
 
@@ -99,8 +99,8 @@ Deferred to future work. Tracked but not in current roadmap.
 | EXEC-06 | Phase 1 | Complete |
 | EXEC-07 | Phase 1 | Complete |
 | DATA-01 | Phase 2 | Pending |
-| DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 2 | Pending |
+| DATA-02 | Phase 2 | Complete |
+| DATA-03 | Phase 2 | Complete |
 | FIG4-01 | Phase 2 | Pending |
 | FIG4-02 | Phase 2 | Pending |
 | FIG4-03 | Phase 3 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 01-03-PLAN.md completion (Phase 1 complete)*
+*Last updated: 2026-02-18 after 02-01-PLAN.md completion (DATA-02, DATA-03 complete)*

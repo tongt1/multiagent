@@ -6,34 +6,36 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 1 Complete -- Ready for Phase 2
+**Current focus:** Phase 2 -- Results Collection and Data Foundation (Plan 1 complete, 2 remaining)
 
 ## Current Position
 
-Phase: 1 (Execution Infrastructure) -- COMPLETE
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 1 complete, ready for Phase 2
-Last activity: 2026-02-18 -- Completed 01-03-PLAN.md (full benchmark runs: 300 task-pair executions)
+Phase: 2 (Results Collection and Data Foundation)
+Plan: 1 of 3 in current phase (02-01 complete)
+Status: Phase 2 in progress
+Last activity: 2026-02-18 -- Completed 02-01-PLAN.md (eval all 300 benchmark runs)
 
-Progress: [##........] 20% (Phase 1: 3/3 plans complete)
+Progress: [###.......] 27% (Phase 1: 3/3 + Phase 2: 1/3 = 4 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 100 min
-- Total execution time: 5 hours
+- Total plans completed: 4
+- Average duration: 91 min
+- Total execution time: 6 hours 5 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 3/3 | 300 min | 100 min |
+| 2 | 1/3 | 65 min | 65 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
 - 01-02: 6 min (2 tasks, 1 file)
 - 01-03: 290 min (2 tasks, 300 result files)
+- 02-01: 65 min (2 tasks, 1 code file + 303 data files)
 
 *Updated after each plan completion*
 
@@ -57,6 +59,8 @@ Recent decisions affecting current work:
 - Agent budget (step_limit=100, cost_limit=0) produces 99.4% submission rate at $0.46/task avg
 - MSWEA_COST_TRACKING=ignore_errors prevents cost calculation failures from halting runs
 - Redis auto-started by cooperbench for coop mode; no manual setup needed
+- Docker eval backend entrypoint override: added entrypoint="" to prevent CooperBench image runner.sh from exiting containers immediately
+- Eval_summary.json regenerated from actual eval.json files after retry pass to ensure accurate aggregate counts
 
 ### Pending Todos
 
@@ -84,13 +88,24 @@ Recent decisions affecting current work:
 
 Results location: `repos/CooperBench/logs/{command-a-solo,command-a-coop-comm,command-a-coop-nocomm}/`
 
+### Eval Results (Phase 2 Output)
+
+| Setting     | Total | Passed | Failed | Errors | With Merge |
+|-------------|-------|--------|--------|--------|------------|
+| Solo        | 100   | 1      | 96     | 3      | 0          |
+| Coop-Comm   | 100   | 0      | 96     | 4      | 100        |
+| Coop-NoComm | 100   | 0      | 88     | 12     | 100        |
+| **Total**   | 300   | 1      | 280    | 19     | 200        |
+
+Eval location: `repos/CooperBench/logs/{command-a-solo,command-a-coop-comm,command-a-coop-nocomm}/**/eval.json`
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 01-03-PLAN.md (full benchmark runs complete)
+Stopped at: Completed 02-01-PLAN.md (eval all 300 benchmark runs)
 Resume file: None
-Next action: Begin Phase 2 (Results Collection and Data Foundation)
+Next action: Execute 02-02-PLAN.md (additional solo seeds for difficulty scoring)
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18*
+*Last updated: 2026-02-18 (02-01 complete)*
