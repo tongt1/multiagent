@@ -20,7 +20,7 @@ Reproduce Figures 4, 5, and 6 from the CooperBench paper (arXiv:2601.13295) usin
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Install cooperbench CLI, pull/verify all 26 Docker images, configure environment
+- [x] 01-01-PLAN.md -- Install cooperbench CLI, pull/verify all 26 Docker images, configure environment
 - [ ] 01-02-PLAN.md -- Create orchestrator script with retry logic, run smoke test (5 pairs)
 - [ ] 01-03-PLAN.md -- Run full benchmark: solo, coop-comm, coop-nocomm (100 pairs each)
 
@@ -103,7 +103,7 @@ Plans:
 
 | Phase | Name | Status | Requirements | Plans |
 |-------|------|--------|--------------|-------|
-| 1 | Execution Infrastructure | Planned | 7 | 3 |
+| 1 | Execution Infrastructure | In Progress (1/3) | 7 | 1/3 |
 | 2 | Results Collection and Data Foundation | Not Started | 5 | -- |
 | 3 | Analysis Modules | Not Started | 10 | -- |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
@@ -113,4 +113,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-14*
+*Last updated: 2026-02-18*
