@@ -26,6 +26,7 @@ dependencies = [
 distributed = ["kubernetes>=28.0"]
 training = ["torch>=2.0", "transformers>=4.40", "wandb>=0.16", "accelerate>=0.30"]
 viewer = ["streamlit>=1.32.0", "plotly>=5.19.0", "pandas>=2.2.0", "pyarrow>=15.0.0"]
+inspect = ["inspect-ai>=0.3.79"]
 
 [dependency-groups]
 dev = [
