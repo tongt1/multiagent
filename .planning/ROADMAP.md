@@ -64,7 +64,7 @@ Plans:
 
 **Requirements:** FIG4-03, FIG4-04, FIG4-05, FIG4-06, FIG5-01, FIG5-02, FIG5-03, FIG5-04, FIG6-01, FIG6-02
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md -- Compute Figure 4 metrics: per-bucket success rates, Wilson CIs, AUC, retention
