@@ -64,6 +64,13 @@ Plans:
 
 **Requirements:** FIG4-03, FIG4-04, FIG4-05, FIG4-06, FIG5-01, FIG5-02, FIG5-03, FIG5-04, FIG6-01, FIG6-02
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md -- Compute Figure 4 metrics: per-bucket success rates, Wilson CIs, AUC, retention
+- [ ] 03-02-PLAN.md -- Compute Figure 5 metrics: success rates, merge conflict rates, speech acts, overhead
+- [ ] 03-03-PLAN.md -- Classify communication errors using LLM-based C1a-C4b taxonomy classifier
+
 **Success Criteria:**
 1. Per-bucket solo and coop success rates with Wilson 95% confidence intervals are computed for all populated difficulty buckets, and AUC (trapezoidal integration) and retention (AUC_coop / AUC_solo) metrics are available as named outputs.
 2. Comm vs no-comm success rates and merge conflict rates are computed with differences reported, ready for bar chart and significance testing.
@@ -112,7 +119,7 @@ Plans:
 |-------|------|--------|--------------|-------|
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
-| 3 | Analysis Modules | Not Started | 10 | -- |
+| 3 | Analysis Modules | Planned | 10 | 0/3 |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
@@ -120,4 +127,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-18 (02-03 complete, Phase 2 complete)*
+*Last updated: 2026-02-18 (Phase 3 planned: 3 parallel plans)*
