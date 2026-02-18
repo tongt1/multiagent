@@ -67,7 +67,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Compute Figure 4 metrics: per-bucket success rates, Wilson CIs, AUC, retention
+- [x] 03-01-PLAN.md -- Compute Figure 4 metrics: per-bucket success rates, Wilson CIs, AUC, retention
 - [ ] 03-02-PLAN.md -- Compute Figure 5 metrics: success rates, merge conflict rates, speech acts, overhead
 - [ ] 03-03-PLAN.md -- Classify communication errors using LLM-based C1a-C4b taxonomy classifier
 
@@ -119,12 +119,12 @@ Plans:
 |-------|------|--------|--------------|-------|
 | 1 | Execution Infrastructure | Complete | 7 | 3/3 |
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
-| 3 | Analysis Modules | Planned | 10 | 0/3 |
+| 3 | Analysis Modules | In Progress | 10 | 1/3 |
 | 4 | Figure Generation and Paper Comparison | Not Started | 4 | -- |
 | 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
 
-**Total:** 12/30 requirements complete
+**Total:** 16/30 requirements complete
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-18 (Phase 3 planned: 3 parallel plans)*
+*Last updated: 2026-02-18 (03-01 complete: Figure 4 analysis)*

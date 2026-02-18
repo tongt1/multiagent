@@ -27,10 +27,10 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 - [x] **FIG4-01**: Compute per-task difficulty score d(t) = 1 - Solo(t) in [0,1]
 - [x] **FIG4-02**: Partition tasks into 10 equal-width buckets over [0,1]
-- [ ] **FIG4-03**: Compute per-bucket solo and coop success rates
-- [ ] **FIG4-04**: Compute Wilson 95% confidence intervals for all rates
-- [ ] **FIG4-05**: Compute AUC via trapezoidal integration for solo and coop curves
-- [ ] **FIG4-06**: Compute retention metric (AUC_coop / AUC_solo)
+- [x] **FIG4-03**: Compute per-bucket solo and coop success rates
+- [x] **FIG4-04**: Compute Wilson 95% confidence intervals for all rates
+- [x] **FIG4-05**: Compute AUC via trapezoidal integration for solo and coop curves
+- [x] **FIG4-06**: Compute retention metric (AUC_coop / AUC_solo)
 - [ ] **FIG4-07**: Generate Figure 4 with CI shaded bands, publication-quality PDF/PNG at 300+ DPI
 
 ### Figure 5: Communication Effects
@@ -103,10 +103,10 @@ Deferred to future work. Tracked but not in current roadmap.
 | DATA-03 | Phase 2 | Complete |
 | FIG4-01 | Phase 2 | Complete |
 | FIG4-02 | Phase 2 | Complete |
-| FIG4-03 | Phase 3 | Pending |
-| FIG4-04 | Phase 3 | Pending |
-| FIG4-05 | Phase 3 | Pending |
-| FIG4-06 | Phase 3 | Pending |
+| FIG4-03 | Phase 3 | Complete |
+| FIG4-04 | Phase 3 | Complete |
+| FIG4-05 | Phase 3 | Complete |
+| FIG4-06 | Phase 3 | Complete |
 | FIG4-07 | Phase 4 | Pending |
 | FIG5-01 | Phase 3 | Pending |
 | FIG5-02 | Phase 3 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 02-03-PLAN.md completion (Phase 2 complete: DATA-01, DATA-02, DATA-03, FIG4-01, FIG4-02)*
+*Last updated: 2026-02-18 after 03-01-PLAN.md completion (FIG4-03, FIG4-04, FIG4-05, FIG4-06 complete)*

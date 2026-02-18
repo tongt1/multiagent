@@ -6,23 +6,23 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 2 complete -- Results Collection and Data Foundation. Ready for Phase 3.
+**Current focus:** Phase 3 in progress -- Analysis Modules (2 of 3 plans complete).
 
 ## Current Position
 
-Phase: 2 (Results Collection and Data Foundation)
-Plan: 3 of 3 in current phase (02-03 complete -- phase complete)
-Status: Phase 2 complete
-Last activity: 2026-02-18 -- Completed 02-03-PLAN.md (unified results collection and data store)
+Phase: 3 (Analysis Modules)
+Plan: 2 of 3 in current phase (03-02 complete)
+Status: In progress
+Last activity: 2026-02-18 -- Completed 03-02-PLAN.md (Figure 5 analysis: success rates, merge conflict rates, speech acts, overhead)
 
-Progress: [######....] 40% (Phase 1: 3/3 + Phase 2: 3/3 = 6 plans complete)
+Progress: [######....] 53% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 2/3 = 8 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 72 min
-- Total execution time: 7 hours 18 min
+- Total plans completed: 8
+- Average duration: 56 min
+- Total execution time: 7 hours 24 min
 
 **By Phase:**
 
@@ -30,6 +30,7 @@ Progress: [######....] 40% (Phase 1: 3/3 + Phase 2: 3/3 = 6 plans complete)
 |-------|-------|-------|----------|
 | 1 | 3/3 | 300 min | 100 min |
 | 2 | 3/3 | 218 min | 73 min |
+| 3 | 2/3 | 6 min | 3 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
@@ -38,6 +39,8 @@ Progress: [######....] 40% (Phase 1: 3/3 + Phase 2: 3/3 = 6 plans complete)
 - 02-01: 65 min (2 tasks, 1 code file + 303 data files)
 - 02-02: 150 min (2 tasks, 200 data files)
 - 02-03: 3 min (2 tasks, 2 files)
+- 03-01: 3 min (2 tasks, 2 files)
+- 03-02: 3 min (2 tasks, 2 files)
 
 *Updated after each plan completion*
 
@@ -67,6 +70,12 @@ Recent decisions affecting current work:
 - No merge_union outcomes observed: all coop merges are merge_clean (naive) or merge_failed
 - LimitsExceeded override applied to 4 records (all already both_passed=false)
 - Only 3 of 10 difficulty buckets populated (buckets 3, 6, 9) due to single-model low pass rates
+- Solo rates use seed=0 only for Figure 4 per-bucket comparisons (97 valid records after eval error exclusion)
+- Wilson CI returns (0.0, 1.0) for n=0 edge case (complete uncertainty)
+- AUC integrates over populated buckets only (3 points), not all 10 -- documented as rough approximation
+- Merge conflict rates use ALL coop records (including eval_error) because merge outcomes are valid even when eval subsequently fails
+- Speech act percentages use largest-remainder rounding to guarantee sum == 100.0%
+- Speech acts collected from ALL coop-comm records (428 messages) regardless of eval_error
 
 ### Pending Todos
 
@@ -121,13 +130,35 @@ Collection script: `scripts/collect_results.py` (rerunnable)
 Difficulty: {0.3333: 1 pair, 0.6667: 1 pair, 1.0: 98 pairs}
 Populated buckets: 3/10 (buckets 3, 6, 9)
 
+### Figure 4 Analysis (Phase 3 Output)
+
+| Setting | AUC | Retention |
+|---------|-----|-----------|
+| Solo | 0.15 | -- |
+| Coop-Comm | 0.0 | 0.0 |
+| Coop-NoComm | 0.0 | 0.0 |
+
+Key: Bucket 3 solo 1/1 passed (100%), all other bucket/setting combos 0%. Solo AUC driven entirely by bucket 3.
+Data files: `scripts/analyze_fig4.py`, `data/fig4_metrics.json`
+
+### Figure 5 Analysis (Phase 3 Output)
+
+| Metric | Coop-Comm | Coop-NoComm | Difference |
+|--------|-----------|-------------|------------|
+| Success Rate | 0/96 = 0.0% | 0/88 = 0.0% | -- |
+| Merge Conflict Rate | 41/100 = 41.0% | 55/100 = 55.0% | Comm reduces by 14% |
+
+Speech acts (428 messages): plan 46.7%, question 26.0%, update 10.5%, other 16.8%
+Communication overhead: mean 22.8%, median 21.1%, range 2.9%--53.8%
+Data files: `scripts/analyze_fig5.py`, `data/fig5_metrics.json`
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 02-03-PLAN.md (unified results collection and data store) -- Phase 2 complete
+Stopped at: Completed 03-02-PLAN.md (Figure 5 analysis: success rates, merge conflict rates, speech acts, overhead)
 Resume file: None
-Next action: Begin Phase 3 (Analysis Modules)
+Next action: Continue Phase 3 (03-03-PLAN.md: Figure 6 LLM-based taxonomy classifier)
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (02-03 complete, Phase 2 complete)*
+*Last updated: 2026-02-18 (03-02 complete, Phase 3 in progress)*
