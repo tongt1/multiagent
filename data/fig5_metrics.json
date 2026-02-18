@@ -1,0 +1,774 @@
+{
+  "success_rates": {
+    "coop_comm": {
+      "successes": 0,
+      "total": 96,
+      "rate": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.038477
+    },
+    "coop_nocomm": {
+      "successes": 0,
+      "total": 88,
+      "rate": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.041829
+    }
+  },
+  "merge_conflict_rates": {
+    "coop_comm": {
+      "conflicts": 41,
+      "total": 100,
+      "rate": 0.41,
+      "ci_lower": 0.318672,
+      "ci_upper": 0.507987
+    },
+    "coop_nocomm": {
+      "conflicts": 55,
+      "total": 100,
+      "rate": 0.55,
+      "ci_lower": 0.452444,
+      "ci_upper": 0.643856
+    },
+    "difference": {
+      "value": 0.14,
+      "direction": "comm reduces conflicts by 14.0%"
+    }
+  },
+  "speech_acts": {
+    "total_messages": 428,
+    "plan": {
+      "count": 200,
+      "pct": 46.7
+    },
+    "question": {
+      "count": 111,
+      "pct": 26.0
+    },
+    "update": {
+      "count": 45,
+      "pct": 10.5
+    },
+    "other": {
+      "count": 72,
+      "pct": 16.8
+    }
+  },
+  "overhead": {
+    "mean_pct": 22.8,
+    "median_pct": 21.1,
+    "min_pct": 2.9,
+    "max_pct": 53.8,
+    "std_pct": 11.3,
+    "n_tasks": 100,
+    "per_task": [
+      {
+        "task_id": 1655,
+        "repo": "dottxt_ai_outlines_task",
+        "messages": 4,
+        "total_steps": 35,
+        "overhead_pct": 11.4
+      },
+      {
+        "task_id": 1655,
+        "repo": "dottxt_ai_outlines_task",
+        "messages": 4,
+        "total_steps": 12,
+        "overhead_pct": 33.3
+      },
+      {
+        "task_id": 1706,
+        "repo": "dottxt_ai_outlines_task",
+        "messages": 2,
+        "total_steps": 15,
+        "overhead_pct": 13.3
+      },
+      {
+        "task_id": 1706,
+        "repo": "dottxt_ai_outlines_task",
+        "messages": 4,
+        "total_steps": 13,
+        "overhead_pct": 30.8
+      },
+      {
+        "task_id": 1706,
+        "repo": "dottxt_ai_outlines_task",
+        "messages": 8,
+        "total_steps": 23,
+        "overhead_pct": 34.8
+      },
+      {
+        "task_id": 8394,
+        "repo": "dspy_task",
+        "messages": 4,
+        "total_steps": 16,
+        "overhead_pct": 25.0
+      },
+      {
+        "task_id": 8394,
+        "repo": "dspy_task",
+        "messages": 3,
+        "total_steps": 28,
+        "overhead_pct": 10.7
+      },
+      {
+        "task_id": 8394,
+        "repo": "dspy_task",
+        "messages": 6,
+        "total_steps": 51,
+        "overhead_pct": 11.8
+      },
+      {
+        "task_id": 8587,
+        "repo": "dspy_task",
+        "messages": 4,
+        "total_steps": 11,
+        "overhead_pct": 36.4
+      },
+      {
+        "task_id": 8587,
+        "repo": "dspy_task",
+        "messages": 4,
+        "total_steps": 22,
+        "overhead_pct": 18.2
+      },
+      {
+        "task_id": 8587,
+        "repo": "dspy_task",
+        "messages": 3,
+        "total_steps": 11,
+        "overhead_pct": 27.3
+      },
+      {
+        "task_id": 8587,
+        "repo": "dspy_task",
+        "messages": 10,
+        "total_steps": 35,
+        "overhead_pct": 28.6
+      },
+      {
+        "task_id": 8635,
+        "repo": "dspy_task",
+        "messages": 8,
+        "total_steps": 18,
+        "overhead_pct": 44.4
+      },
+      {
+        "task_id": 8635,
+        "repo": "dspy_task",
+        "messages": 4,
+        "total_steps": 13,
+        "overhead_pct": 30.8
+      },
+      {
+        "task_id": 26,
+        "repo": "go_chi_task",
+        "messages": 2,
+        "total_steps": 12,
+        "overhead_pct": 16.7
+      },
+      {
+        "task_id": 26,
+        "repo": "go_chi_task",
+        "messages": 5,
+        "total_steps": 21,
+        "overhead_pct": 23.8
+      },
+      {
+        "task_id": 27,
+        "repo": "go_chi_task",
+        "messages": 4,
+        "total_steps": 16,
+        "overhead_pct": 25.0
+      },
+      {
+        "task_id": 56,
+        "repo": "go_chi_task",
+        "messages": 4,
+        "total_steps": 14,
+        "overhead_pct": 28.6
+      },
+      {
+        "task_id": 56,
+        "repo": "go_chi_task",
+        "messages": 6,
+        "total_steps": 16,
+        "overhead_pct": 37.5
+      },
+      {
+        "task_id": 3997,
+        "repo": "huggingface_datasets_task",
+        "messages": 5,
+        "total_steps": 12,
+        "overhead_pct": 41.7
+      },
+      {
+        "task_id": 3997,
+        "repo": "huggingface_datasets_task",
+        "messages": 3,
+        "total_steps": 33,
+        "overhead_pct": 9.1
+      },
+      {
+        "task_id": 6252,
+        "repo": "huggingface_datasets_task",
+        "messages": 4,
+        "total_steps": 38,
+        "overhead_pct": 10.5
+      },
+      {
+        "task_id": 17244,
+        "repo": "llama_index_task",
+        "messages": 2,
+        "total_steps": 16,
+        "overhead_pct": 12.5
+      },
+      {
+        "task_id": 18813,
+        "repo": "llama_index_task",
+        "messages": 2,
+        "total_steps": 16,
+        "overhead_pct": 12.5
+      },
+      {
+        "task_id": 18813,
+        "repo": "llama_index_task",
+        "messages": 2,
+        "total_steps": 17,
+        "overhead_pct": 11.8
+      },
+      {
+        "task_id": 0,
+        "repo": "openai_tiktoken_task",
+        "messages": 4,
+        "total_steps": 23,
+        "overhead_pct": 17.4
+      },
+      {
+        "task_id": 0,
+        "repo": "openai_tiktoken_task",
+        "messages": 4,
+        "total_steps": 24,
+        "overhead_pct": 16.7
+      },
+      {
+        "task_id": 0,
+        "repo": "openai_tiktoken_task",
+        "messages": 3,
+        "total_steps": 13,
+        "overhead_pct": 23.1
+      },
+      {
+        "task_id": 0,
+        "repo": "openai_tiktoken_task",
+        "messages": 5,
+        "total_steps": 27,
+        "overhead_pct": 18.5
+      },
+      {
+        "task_id": 0,
+        "repo": "openai_tiktoken_task",
+        "messages": 4,
+        "total_steps": 19,
+        "overhead_pct": 21.1
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 3,
+        "total_steps": 55,
+        "overhead_pct": 5.5
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 7,
+        "total_steps": 27,
+        "overhead_pct": 25.9
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 3,
+        "total_steps": 32,
+        "overhead_pct": 9.4
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 5,
+        "total_steps": 20,
+        "overhead_pct": 25.0
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 5,
+        "total_steps": 79,
+        "overhead_pct": 6.3
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 6,
+        "total_steps": 20,
+        "overhead_pct": 30.0
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 27,
+        "overhead_pct": 14.8
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 27,
+        "overhead_pct": 14.8
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 15,
+        "overhead_pct": 26.7
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 7,
+        "total_steps": 28,
+        "overhead_pct": 25.0
+      },
+      {
+        "task_id": 2068,
+        "repo": "pallets_click_task",
+        "messages": 3,
+        "total_steps": 28,
+        "overhead_pct": 10.7
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 20,
+        "overhead_pct": 20.0
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 5,
+        "total_steps": 18,
+        "overhead_pct": 27.8
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 2,
+        "total_steps": 12,
+        "overhead_pct": 16.7
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 1,
+        "total_steps": 21,
+        "overhead_pct": 4.8
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 5,
+        "total_steps": 22,
+        "overhead_pct": 22.7
+      },
+      {
+        "task_id": 2800,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 12,
+        "overhead_pct": 33.3
+      },
+      {
+        "task_id": 2956,
+        "repo": "pallets_click_task",
+        "messages": 6,
+        "total_steps": 31,
+        "overhead_pct": 19.4
+      },
+      {
+        "task_id": 2956,
+        "repo": "pallets_click_task",
+        "messages": 4,
+        "total_steps": 21,
+        "overhead_pct": 19.0
+      },
+      {
+        "task_id": 2956,
+        "repo": "pallets_click_task",
+        "messages": 6,
+        "total_steps": 18,
+        "overhead_pct": 33.3
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 1,
+        "total_steps": 13,
+        "overhead_pct": 7.7
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 1,
+        "total_steps": 20,
+        "overhead_pct": 5.0
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 1,
+        "total_steps": 35,
+        "overhead_pct": 2.9
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 5,
+        "total_steps": 26,
+        "overhead_pct": 19.2
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 4,
+        "total_steps": 15,
+        "overhead_pct": 26.7
+      },
+      {
+        "task_id": 1465,
+        "repo": "pallets_jinja_task",
+        "messages": 6,
+        "total_steps": 52,
+        "overhead_pct": 11.5
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 8,
+        "total_steps": 20,
+        "overhead_pct": 40.0
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 5,
+        "total_steps": 23,
+        "overhead_pct": 21.7
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 7,
+        "total_steps": 17,
+        "overhead_pct": 41.2
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 5,
+        "total_steps": 15,
+        "overhead_pct": 33.3
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 4,
+        "total_steps": 36,
+        "overhead_pct": 11.1
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 7,
+        "total_steps": 13,
+        "overhead_pct": 53.8
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 6,
+        "total_steps": 13,
+        "overhead_pct": 46.2
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 11,
+        "total_steps": 22,
+        "overhead_pct": 50.0
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 3,
+        "total_steps": 22,
+        "overhead_pct": 13.6
+      },
+      {
+        "task_id": 1559,
+        "repo": "pallets_jinja_task",
+        "messages": 5,
+        "total_steps": 15,
+        "overhead_pct": 33.3
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 6,
+        "total_steps": 21,
+        "overhead_pct": 28.6
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 3,
+        "total_steps": 22,
+        "overhead_pct": 13.6
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 2,
+        "total_steps": 27,
+        "overhead_pct": 7.4
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 3,
+        "total_steps": 11,
+        "overhead_pct": 27.3
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 3,
+        "total_steps": 11,
+        "overhead_pct": 27.3
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 4,
+        "total_steps": 25,
+        "overhead_pct": 16.0
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 3,
+        "total_steps": 11,
+        "overhead_pct": 27.3
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 6,
+        "total_steps": 12,
+        "overhead_pct": 50.0
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 4,
+        "total_steps": 21,
+        "overhead_pct": 19.0
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 5,
+        "total_steps": 13,
+        "overhead_pct": 38.5
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 4,
+        "total_steps": 50,
+        "overhead_pct": 8.0
+      },
+      {
+        "task_id": 1621,
+        "repo": "pallets_jinja_task",
+        "messages": 2,
+        "total_steps": 12,
+        "overhead_pct": 16.7
+      },
+      {
+        "task_id": 25,
+        "repo": "pillow_task",
+        "messages": 8,
+        "total_steps": 27,
+        "overhead_pct": 29.6
+      },
+      {
+        "task_id": 25,
+        "repo": "pillow_task",
+        "messages": 6,
+        "total_steps": 17,
+        "overhead_pct": 35.3
+      },
+      {
+        "task_id": 25,
+        "repo": "pillow_task",
+        "messages": 5,
+        "total_steps": 16,
+        "overhead_pct": 31.2
+      },
+      {
+        "task_id": 25,
+        "repo": "pillow_task",
+        "messages": 4,
+        "total_steps": 22,
+        "overhead_pct": 18.2
+      },
+      {
+        "task_id": 290,
+        "repo": "pillow_task",
+        "messages": 2,
+        "total_steps": 13,
+        "overhead_pct": 15.4
+      },
+      {
+        "task_id": 290,
+        "repo": "pillow_task",
+        "messages": 5,
+        "total_steps": 18,
+        "overhead_pct": 27.8
+      },
+      {
+        "task_id": 290,
+        "repo": "pillow_task",
+        "messages": 3,
+        "total_steps": 22,
+        "overhead_pct": 13.6
+      },
+      {
+        "task_id": 68,
+        "repo": "pillow_task",
+        "messages": 4,
+        "total_steps": 19,
+        "overhead_pct": 21.1
+      },
+      {
+        "task_id": 153,
+        "repo": "react_hook_form_task",
+        "messages": 3,
+        "total_steps": 24,
+        "overhead_pct": 12.5
+      },
+      {
+        "task_id": 85,
+        "repo": "react_hook_form_task",
+        "messages": 4,
+        "total_steps": 22,
+        "overhead_pct": 18.2
+      },
+      {
+        "task_id": 43,
+        "repo": "samuelcolvin_dirty_equals_task",
+        "messages": 2,
+        "total_steps": 13,
+        "overhead_pct": 15.4
+      },
+      {
+        "task_id": 43,
+        "repo": "samuelcolvin_dirty_equals_task",
+        "messages": 2,
+        "total_steps": 19,
+        "overhead_pct": 10.5
+      },
+      {
+        "task_id": 43,
+        "repo": "samuelcolvin_dirty_equals_task",
+        "messages": 2,
+        "total_steps": 11,
+        "overhead_pct": 18.2
+      },
+      {
+        "task_id": 43,
+        "repo": "samuelcolvin_dirty_equals_task",
+        "messages": 5,
+        "total_steps": 14,
+        "overhead_pct": 35.7
+      },
+      {
+        "task_id": 43,
+        "repo": "samuelcolvin_dirty_equals_task",
+        "messages": 2,
+        "total_steps": 11,
+        "overhead_pct": 18.2
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 2,
+        "total_steps": 15,
+        "overhead_pct": 13.3
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 7,
+        "total_steps": 18,
+        "overhead_pct": 38.9
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 7,
+        "total_steps": 25,
+        "overhead_pct": 28.0
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 4,
+        "total_steps": 13,
+        "overhead_pct": 30.8
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 4,
+        "total_steps": 10,
+        "overhead_pct": 40.0
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 3,
+        "total_steps": 17,
+        "overhead_pct": 17.6
+      },
+      {
+        "task_id": 6554,
+        "repo": "typst_task",
+        "messages": 5,
+        "total_steps": 23,
+        "overhead_pct": 21.7
+      }
+    ]
+  },
+  "metadata": {
+    "input_file": "/mnt/data/terry/home/cooperbench-repro/data/results.json",
+    "total_records": 500,
+    "coop_comm_records": 100,
+    "coop_nocomm_records": 100,
+    "speech_act_method": "regex heuristics with priority ordering (question > update > plan > other)"
+  }
+}
