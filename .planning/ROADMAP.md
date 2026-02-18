@@ -45,7 +45,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- Fix Docker eval backend entrypoint bug, run evaluation on all 300 existing benchmark results
-- [ ] 02-02-PLAN.md -- Run 2 additional solo seeds (3 total) and evaluate them for difficulty scoring
+- [x] 02-02-PLAN.md -- Run 2 additional solo seeds (3 total) and evaluate them for difficulty scoring
 - [ ] 02-03-PLAN.md -- Build collection script, compute difficulty scores, produce unified data/results.json
 
 **Success Criteria:**
