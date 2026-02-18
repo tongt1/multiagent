@@ -35,7 +35,7 @@ COOP_COMM_NAME="command-a-coop-comm"
 COOP_NOCOMM_NAME="command-a-coop-nocomm"
 
 # Environment variables (set defaults if not already exported)
-export MSWEA_MODEL_API_BASE="${MSWEA_MODEL_API_BASE:-https://stg.api.cohere.com/v2}"
+export MSWEA_MODEL_API_BASE="${MSWEA_MODEL_API_BASE:-https://stg.api.cohere.com/v2/chat}"
 export MSWEA_COST_TRACKING="${MSWEA_COST_TRACKING:-ignore_errors}"
 export LITELLM_LOG="${LITELLM_LOG:-ERROR}"
 
