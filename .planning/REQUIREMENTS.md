@@ -43,8 +43,8 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Figure 6: Communication Error Taxonomy
 
-- [ ] **FIG6-01**: Implement LLM-based communication error classifier using paper's taxonomy prompt (C1a unanswered no-reply, C1b unanswered ignored, C2 non-answer/vague, C3b incorrect claim corrected, C4a spammy same info, C4b spammy near-duplicate blocks)
-- [ ] **FIG6-02**: Run classifier on all coop-with-comm transcripts
+- [x] **FIG6-01**: Implement LLM-based communication error classifier using paper's taxonomy prompt (C1a unanswered no-reply, C1b unanswered ignored, C2 non-answer/vague, C3b incorrect claim corrected, C4a spammy same info, C4b spammy near-duplicate blocks)
+- [x] **FIG6-02**: Run classifier on all coop-with-comm transcripts
 - [ ] **FIG6-03**: Generate Figure 6 as error frequency bar chart
 
 ### Qualitative Analysis
@@ -113,8 +113,8 @@ Deferred to future work. Tracked but not in current roadmap.
 | FIG5-03 | Phase 3 | Complete |
 | FIG5-04 | Phase 3 | Complete |
 | FIG5-05 | Phase 4 | Pending |
-| FIG6-01 | Phase 3 | Pending |
-| FIG6-02 | Phase 3 | Pending |
+| FIG6-01 | Phase 3 | Complete |
+| FIG6-02 | Phase 3 | Complete |
 | FIG6-03 | Phase 4 | Pending |
 | QUAL-01 | Phase 5 | Pending |
 | QUAL-02 | Phase 5 | Pending |

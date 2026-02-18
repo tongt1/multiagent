@@ -6,23 +6,23 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 3 in progress -- Analysis Modules (2 of 3 plans complete).
+**Current focus:** Phase 3 complete -- Analysis Modules. Ready for Phase 4.
 
 ## Current Position
 
 Phase: 3 (Analysis Modules)
-Plan: 2 of 3 in current phase (03-02 complete)
-Status: In progress
-Last activity: 2026-02-18 -- Completed 03-02-PLAN.md (Figure 5 analysis: success rates, merge conflict rates, speech acts, overhead)
+Plan: 3 of 3 in current phase (03-03 complete -- phase complete)
+Status: Phase 3 complete
+Last activity: 2026-02-18 -- Completed 03-03-PLAN.md (Figure 6 LLM-based communication error classifier)
 
-Progress: [######....] 53% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 2/3 = 8 plans complete)
+Progress: [######....] 60% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 = 9 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 56 min
-- Total execution time: 7 hours 24 min
+- Total plans completed: 9
+- Average duration: 50 min
+- Total execution time: 7 hours 30 min
 
 **By Phase:**
 
@@ -30,7 +30,7 @@ Progress: [######....] 53% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 2/3 = 8 plans
 |-------|-------|-------|----------|
 | 1 | 3/3 | 300 min | 100 min |
 | 2 | 3/3 | 218 min | 73 min |
-| 3 | 2/3 | 6 min | 3 min |
+| 3 | 3/3 | 12 min | 4 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
@@ -41,6 +41,7 @@ Progress: [######....] 53% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 2/3 = 8 plans
 - 02-03: 3 min (2 tasks, 2 files)
 - 03-01: 3 min (2 tasks, 2 files)
 - 03-02: 3 min (2 tasks, 2 files)
+- 03-03: 6 min (2 tasks, 2 files)
 
 *Updated after each plan completion*
 
@@ -76,6 +77,9 @@ Recent decisions affecting current work:
 - Merge conflict rates use ALL coop records (including eval_error) because merge outcomes are valid even when eval subsequently fails
 - Speech act percentages use largest-remainder rounding to guarantee sum == 100.0%
 - Speech acts collected from ALL coop-comm records (428 messages) regardless of eval_error
+- NEW LLM classifier for Figure 6 taxonomy (not cooperbench-eval) -- message-quality errors, not coordination failures
+- Command A via staging endpoint for taxonomy classification (same key as benchmark runs)
+- Temperature 0.0 for deterministic classification results
 
 ### Pending Todos
 
@@ -152,13 +156,28 @@ Speech acts (428 messages): plan 46.7%, question 26.0%, update 10.5%, other 16.8
 Communication overhead: mean 22.8%, median 21.1%, range 2.9%--53.8%
 Data files: `scripts/analyze_fig5.py`, `data/fig5_metrics.json`
 
+### Figure 6 Analysis (Phase 3 Output)
+
+| Category | Count | % of Errors | % of Transcripts |
+|----------|-------|-------------|------------------|
+| C1a (Unanswered - No Reply) | 9 | 11.7% | 8.0% |
+| C1b (Unanswered - Ignored) | 7 | 9.1% | 5.0% |
+| C2 (Non-answer/Vague) | 1 | 1.3% | 1.0% |
+| C3b (Incorrect Claim) | 3 | 3.9% | 3.0% |
+| C4a (Spammy - Same Info) | 32 | 41.6% | 25.0% |
+| C4b (Spammy - Near-duplicate) | 25 | 32.5% | 20.0% |
+
+Total: 77 errors across 100 transcripts, 51 with errors, 0 API failures
+Dominant: Spammy categories (C4a+C4b) = 74.0% of all errors
+Data files: `scripts/analyze_fig6.py`, `data/fig6_metrics.json`
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 03-02-PLAN.md (Figure 5 analysis: success rates, merge conflict rates, speech acts, overhead)
+Stopped at: Completed 03-03-PLAN.md (Figure 6 LLM-based communication error classifier) -- Phase 3 complete
 Resume file: None
-Next action: Continue Phase 3 (03-03-PLAN.md: Figure 6 LLM-based taxonomy classifier)
+Next action: Begin Phase 4 (Figure Generation)
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (03-02 complete, Phase 3 in progress)*
+*Last updated: 2026-02-18 (03-03 complete, Phase 3 complete)*
