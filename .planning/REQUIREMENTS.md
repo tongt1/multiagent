@@ -35,10 +35,10 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Figure 5: Communication Effects
 
-- [ ] **FIG5-01**: Compute comm vs no-comm success rates
-- [ ] **FIG5-02**: Compute merge conflict rates with and without communication
-- [ ] **FIG5-03**: Classify agent messages into speech act types (plan/question/update)
-- [ ] **FIG5-04**: Compute communication overhead as percentage of total action budget
+- [x] **FIG5-01**: Compute comm vs no-comm success rates
+- [x] **FIG5-02**: Compute merge conflict rates with and without communication
+- [x] **FIG5-03**: Classify agent messages into speech act types (plan/question/update)
+- [x] **FIG5-04**: Compute communication overhead as percentage of total action budget
 - [ ] **FIG5-05**: Generate Figure 5 as 3-panel plot: (a) success rates, (b) conflict rates, (c) overhead breakdown
 
 ### Figure 6: Communication Error Taxonomy
@@ -108,10 +108,10 @@ Deferred to future work. Tracked but not in current roadmap.
 | FIG4-05 | Phase 3 | Complete |
 | FIG4-06 | Phase 3 | Complete |
 | FIG4-07 | Phase 4 | Pending |
-| FIG5-01 | Phase 3 | Pending |
-| FIG5-02 | Phase 3 | Pending |
-| FIG5-03 | Phase 3 | Pending |
-| FIG5-04 | Phase 3 | Pending |
+| FIG5-01 | Phase 3 | Complete |
+| FIG5-02 | Phase 3 | Complete |
+| FIG5-03 | Phase 3 | Complete |
+| FIG5-04 | Phase 3 | Complete |
 | FIG5-05 | Phase 4 | Pending |
 | FIG6-01 | Phase 3 | Pending |
 | FIG6-02 | Phase 3 | Pending |
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 03-01-PLAN.md completion (FIG4-03, FIG4-04, FIG4-05, FIG4-06 complete)*
+*Last updated: 2026-02-18 after 03-02-PLAN.md completion (FIG5-01, FIG5-02, FIG5-03, FIG5-04 complete)*
