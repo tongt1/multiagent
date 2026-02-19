@@ -1,82 +1,132 @@
-# Requirements: Reward Shaping Comparison Experiment
+# Requirements: CooperBench Reproduction
 
 **Defined:** 2026-02-14
-**Core Value:** All 5 reward strategies must be fully wired end-to-end so shaped rewards affect gradient updates and produce meaningful WandB comparison curves.
+**Core Value:** Produce verifiable figures 4, 5, 6 from CooperBench paper using Command A, with qualitative transcript analysis
 
 ## v1 Requirements
 
-### Reward Integration
+Requirements for initial reproduction. Each maps to roadmap phases.
 
-- [ ] **RINT-01**: DebateMetricStreamer applies selected reward shaping strategy to raw rewards before they reach the learner
-- [ ] **RINT-02**: Shaped rewards replace raw rewards in GRPO/RLOO gradient computation (not just logged as side metrics)
-- [ ] **RINT-03**: Per-role reward dicts (from difference_rewards, coma_advantage, reward_mixing) are correctly handled — mapped to per-turn rewards based on role labels
-- [ ] **RINT-04**: Identity strategy produces identical training behavior to no-strategy baseline (regression check)
+### Execution Infrastructure
 
-### Experiment Configuration
+- [x] **EXEC-01**: Pull/build all Docker images required for lite subset (26 tasks, 8 currently missing)
+- [x] **EXEC-02**: Verify upstream CooperBench CLI works end-to-end with Docker backend on a smoke test (5 pairs)
+- [x] **EXEC-03**: Run Command A in solo mode on full lite subset (100 pairs)
+- [x] **EXEC-04**: Run Command A in coop mode with communication on full lite subset
+- [x] **EXEC-05**: Run Command A in coop mode without communication on full lite subset
+- [x] **EXEC-06**: Implement cost tracking per run (no budget ceiling — track and report costs but don't halt execution)
+- [x] **EXEC-07**: Implement retry policy for infrastructure failures (Docker OOM, timeouts) with infra_error tagging
 
-- [ ] **ECFG-01**: SWEEP config for identity baseline (SmolLM-135M, flex queue, dev-low, MATH-500)
-- [ ] **ECFG-02**: SWEEP config for difference_rewards strategy
-- [ ] **ECFG-03**: SWEEP config for potential_based strategy (debate_length potential, gamma=0.99)
-- [ ] **ECFG-04**: SWEEP config for coma_advantage strategy (n_rollouts_per_prompt=4)
-- [ ] **ECFG-05**: SWEEP config for reward_mixing strategy (alpha=0.5)
-- [ ] **ECFG-06**: All 5 configs share identical hyperparameters except reward shaping (fair comparison)
-- [ ] **ECFG-07**: All 5 configs use post-training flex queue with dev-low priority
-- [ ] **ECFG-08**: All 5 configs use MATH-500 online data from existing GCS path
+### Results Collection
 
-### Observability
+- [x] **DATA-01**: Normalize upstream log directory structure into unified JSON results store
+- [x] **DATA-02**: Distinguish infrastructure errors from genuine test failures in results
+- [x] **DATA-03**: Track merge outcomes as separate dimension from test outcomes (merge_clean/merge_union/merge_failed x tests_pass/tests_fail)
 
-- [ ] **OBSV-01**: WandB logs shaped reward values per training step (distinct from raw correctness_score)
-- [ ] **OBSV-02**: WandB logs reward strategy name as run metadata for filtering/grouping
-- [ ] **OBSV-03**: Training loss, accuracy, and shaped reward curves visible and comparable across all 5 runs in same WandB project
+### Figure 4: Difficulty-Stratified Success Curves
+
+- [x] **FIG4-01**: Compute per-task difficulty score d(t) = 1 - Solo(t) in [0,1]
+- [x] **FIG4-02**: Partition tasks into 10 equal-width buckets over [0,1]
+- [x] **FIG4-03**: Compute per-bucket solo and coop success rates
+- [x] **FIG4-04**: Compute Wilson 95% confidence intervals for all rates
+- [x] **FIG4-05**: Compute AUC via trapezoidal integration for solo and coop curves
+- [x] **FIG4-06**: Compute retention metric (AUC_coop / AUC_solo)
+- [x] **FIG4-07**: Generate Figure 4 with CI shaded bands, publication-quality PDF/PNG at 300+ DPI
+
+### Figure 5: Communication Effects
+
+- [x] **FIG5-01**: Compute comm vs no-comm success rates
+- [x] **FIG5-02**: Compute merge conflict rates with and without communication
+- [x] **FIG5-03**: Classify agent messages into speech act types (plan/question/update)
+- [x] **FIG5-04**: Compute communication overhead as percentage of total action budget
+- [x] **FIG5-05**: Generate Figure 5 as 3-panel plot: (a) success rates, (b) conflict rates, (c) overhead breakdown
+
+### Figure 6: Communication Error Taxonomy
+
+- [x] **FIG6-01**: Implement LLM-based communication error classifier using paper's taxonomy prompt (C1a unanswered no-reply, C1b unanswered ignored, C2 non-answer/vague, C3b incorrect claim corrected, C4a spammy same info, C4b spammy near-duplicate blocks)
+- [x] **FIG6-02**: Run classifier on all coop-with-comm transcripts
+- [x] **FIG6-03**: Generate Figure 6 as error frequency bar chart
+
+### Qualitative Analysis
+
+- [x] **QUAL-01**: Compute Plan:Question ratio per trajectory and correlate with merge conflict outcomes
+- [x] **QUAL-02**: Detect first-turn planning (Plan message in first turn) and measure conflict rate reduction
+- [x] **QUAL-03**: Count specificity metrics per trajectory (line number mentions, file path mentions)
+- [x] **QUAL-04**: Generate summary table comparing qualitative metrics for conflict vs no-conflict trajectories
+
+### Paper Comparison
+
+- [x] **COMP-01**: Overlay paper's published baseline numbers on Figures 4, 5, 6 for direct visual comparison
 
 ## v2 Requirements
 
+Deferred to future work. Tracked but not in current roadmap.
+
 ### Extended Analysis
 
-- **ANLZ-01**: Statistical comparison of convergence rates across strategies
-- **ANLZ-02**: Per-role reward decomposition visualization for multi-role strategies
-- **ANLZ-03**: Hyperparameter sensitivity analysis per strategy
+- **EXT-01**: Per-repository performance breakdown across 12 repos
+- **EXT-02**: Spatial vs semantic coordination analysis (file-overlap reduction vs test-pass improvement)
+- **EXT-03**: Multi-format export (PDF/SVG/CSV) for all figures and data
+- **EXT-04**: Transcript excerpt extraction for paper-appendix-style evidence
+- **EXT-05**: Automated figure validation (monotonicity, CI containment, retention bounds)
 
-### Scale-up
+### Scale
 
-- **SCAL-01**: Repeat comparison with 7B model
-- **SCAL-02**: Extended training steps for convergence analysis
+- **SCALE-01**: Run full dataset (652 tasks) after lite validation
+- **SCALE-02**: Multi-model comparison if additional Cohere models become available
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Multi-model training (separate solver/verifier models) | Orthogonal to reward shaping comparison |
-| Rollout strategies (best-of-N, self-consistency) | Separate concern, keep identity rollout |
-| Per-strategy hyperparameter tuning | Fair comparison requires same defaults first |
-| Production-scale runs | 135M is for pipeline validation, scale later |
-| Automated analysis reports | Manual WandB analysis sufficient for v1 |
+| Custom pipeline wrapper for execution | Paper uses OpenHands agent SDK; our custom wrapper generates patches via raw prompts -- architecturally incomparable |
+| Interactive Streamlit dashboard | Static figures are sufficient for reproduction; dashboard adds maintenance burden |
+| Real-time experiment monitoring | Experiments run asynchronously; analysis is post-hoc |
+| Figures 1, 2, 3 from paper | Not requested; focusing on figures 4, 5, 6 |
+| Full upstream CooperBench fork | Build analysis as new module consuming results, not a fork |
+| LLM-based speech act classifier | Paper uses heuristic patterns; regex/keyword heuristics are sufficient and deterministic |
+| Automated LaTeX generation | Figures + data are sufficient; LaTeX authoring is manual |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RINT-01 | Phase 1 | Pending |
-| RINT-02 | Phase 1 | Pending |
-| RINT-03 | Phase 1 | Pending |
-| RINT-04 | Phase 1 | Pending |
-| ECFG-01 | Phase 2 | Pending |
-| ECFG-02 | Phase 2 | Pending |
-| ECFG-03 | Phase 2 | Pending |
-| ECFG-04 | Phase 2 | Pending |
-| ECFG-05 | Phase 2 | Pending |
-| ECFG-06 | Phase 2 | Pending |
-| ECFG-07 | Phase 2 | Pending |
-| ECFG-08 | Phase 2 | Pending |
-| OBSV-01 | Phase 3 | Pending |
-| OBSV-02 | Phase 3 | Pending |
-| OBSV-03 | Phase 3 | Pending |
+| EXEC-01 | Phase 1 | Complete |
+| EXEC-02 | Phase 1 | Complete |
+| EXEC-03 | Phase 1 | Complete |
+| EXEC-04 | Phase 1 | Complete |
+| EXEC-05 | Phase 1 | Complete |
+| EXEC-06 | Phase 1 | Complete |
+| EXEC-07 | Phase 1 | Complete |
+| DATA-01 | Phase 2 | Complete |
+| DATA-02 | Phase 2 | Complete |
+| DATA-03 | Phase 2 | Complete |
+| FIG4-01 | Phase 2 | Complete |
+| FIG4-02 | Phase 2 | Complete |
+| FIG4-03 | Phase 3 | Complete |
+| FIG4-04 | Phase 3 | Complete |
+| FIG4-05 | Phase 3 | Complete |
+| FIG4-06 | Phase 3 | Complete |
+| FIG4-07 | Phase 4 | Complete |
+| FIG5-01 | Phase 3 | Complete |
+| FIG5-02 | Phase 3 | Complete |
+| FIG5-03 | Phase 3 | Complete |
+| FIG5-04 | Phase 3 | Complete |
+| FIG5-05 | Phase 4 | Complete |
+| FIG6-01 | Phase 3 | Complete |
+| FIG6-02 | Phase 3 | Complete |
+| FIG6-03 | Phase 4 | Complete |
+| QUAL-01 | Phase 5 | Complete |
+| QUAL-02 | Phase 5 | Complete |
+| QUAL-03 | Phase 5 | Complete |
+| QUAL-04 | Phase 5 | Complete |
+| COMP-01 | Phase 4 | Complete |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
+- v1 requirements: 30 total
+- Mapped to phases: 30
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-14 after roadmap creation*
+*Last updated: 2026-02-19 after 05-01-PLAN.md completion (QUAL-01 through QUAL-04 complete -- Phase 5 done -- PROJECT COMPLETE)*

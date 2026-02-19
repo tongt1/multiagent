@@ -487,6 +487,72 @@ Examples:
         help="Enable debug logging",
     )
 
+    # ========== COOPERBENCH SUBCOMMAND ==========
+    cooperbench_parser = subparsers.add_parser(
+        "cooperbench",
+        help="Run CooperBench cooperative coding evaluation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run lite subset (100 pairs) in coop mode
+  python -m src.cli.main cooperbench --config configs/cooperbench_default.yaml
+
+  # Run with custom dataset path
+  python -m src.cli.main cooperbench --config configs/cooperbench_default.yaml --dataset-path repos/CooperBench/dataset
+
+  # Run solo baseline
+  python -m src.cli.main cooperbench --config configs/cooperbench_default.yaml --mode solo
+
+  # Limit to 5 problems for testing
+  python -m src.cli.main cooperbench --config configs/cooperbench_default.yaml --limit 5
+
+  # Dry run (skip LLM calls, use mock patches)
+  python -m src.cli.main cooperbench --config configs/cooperbench_default.yaml --dry-run --limit 3
+        """,
+    )
+
+    cooperbench_parser.add_argument(
+        "--config",
+        default="configs/cooperbench_default.yaml",
+        help="Path to CooperBench configuration YAML (default: configs/cooperbench_default.yaml)",
+    )
+
+    cooperbench_parser.add_argument(
+        "--dataset-path",
+        help="Override dataset path from config",
+    )
+
+    cooperbench_parser.add_argument(
+        "--mode",
+        choices=["coop", "solo"],
+        help="Override mode from config (coop or solo)",
+    )
+
+    cooperbench_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of problems to evaluate",
+    )
+
+    cooperbench_parser.add_argument(
+        "--output-dir",
+        default="cooperbench_results",
+        help="Output directory for results (default: cooperbench_results)",
+    )
+
+    cooperbench_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Dry run: load dataset and create pipeline but skip LLM calls",
+    )
+
+    cooperbench_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
     args = parser.parse_args()
 
     # Show help if no subcommand provided
