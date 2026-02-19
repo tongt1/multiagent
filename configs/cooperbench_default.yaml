@@ -5,18 +5,18 @@ mode: coop  # "coop" (2 agents) or "solo" (1 agent baseline)
 
 # Dataset settings
 dataset:
-  path: dataset/
+  path: repos/CooperBench/dataset
   subset: lite  # lite (100 pairs), flash (larger), or null (all 652 tasks)
 
 # Agent settings
 agents:
   solver:
-    model: command-r-plus
+    model: command-a-03-2025
     temperature: 0.2
     max_tokens: 8192
     role: cooperbench_solver
   verifier:
-    model: command-r-plus
+    model: command-a-03-2025
     temperature: 0.2
     max_tokens: 8192
     role: cooperbench_verifier
