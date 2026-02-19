@@ -1,7 +1,7 @@
-######### SmolLM-135M RLOO Math — MARTI reward sweep #########
-wandb.run_name = "{user}_flink_rloo_math_smollm_{date}_{time}"
+######### Llama-3.2-1B-Instruct RLOO Math — checkpoint validation #########
+wandb.run_name = "{user}_flink_rloo_math_llama1b_{date}_{time}"
 wandb.project_name = "multiagent-debate-rl"
-output_dir = "gs://co-train-oktodelete-15d/{user}/marti/smollm-135m/{date}_{time}"
+output_dir = "gs://co-train-oktodelete-15d/{user}/marti/llama-1b/{date}_{time}"
 
 # -- minizord -- #
 minizord.eval.name = "flink_eval"
@@ -38,8 +38,8 @@ l2_trainable_params_loss.alpha = 0.0
 # -- checkpoint saving --
 n_last_ckpts_to_keep = 2
 
-########## Fields generated for SmolLM-135M #########
-metadata.blobheart_tokenizer_id = "multilingual+255k+bos+eos+sptok+fim+agents3"
+########## Fields for Llama-3.2-1B-Instruct #########
+metadata.blobheart_tokenizer_id = "llama-3.2-1b-instruct"
 metadata.experimental_options = {
     "format_for_pretraining": False,
     "use_chat_packing": True,
@@ -49,13 +49,13 @@ metadata.experimental_options = {
 metadata.packing_algorithm = ""
 metadata.command_dataset_version = ""
 metadata.model_type = "OfflinePreferenceModelBuilder"
-metadata.model_size = "0.135B"
+metadata.model_size = "1.24B"
 metadata.reasoning = True
 
 # -- data -- #
-max_sequence_length = 2048
+max_sequence_length = 4096
 tokenizer_path = (
-    "gs://cohere-prod/encoders/releases/0.6.0/m255k_bos_eos_fim_agents3_special_tokens_with_eot_template-ns.json"
+    "gs://cohere-dev-central-2/users/terry/llama-1b-instruct-eot/tokenizer.json"
 )
 data_loader.name = "rl_dataloader"
 data_loader.kwargs = {"debug": False, "json_encoder_name": "CombLineEncoder"}
@@ -119,7 +119,7 @@ experimental_fast_rng = False
 # -- RNG seed -- #
 seed = 42
 
-# -- Quantization (disabled for SmolLM) -- #
+# -- Quantization (disabled for Llama 1B) -- #
 quantize.params = False
 quantize.activations = False
 quantize.alibi_activations = False

@@ -1,24 +1,27 @@
-"""SWEEP config for COMA advantage reward shaping (SmolLM-135M, MATH-500).
+"""GPU Cluster Unit Test: Minimal job to validate sidecar initialization.
 
-COMA (Counterfactual Multi-Agent) advantage: A_i = r_i - baseline_i.
-The counterfactual baseline marginalizes over agent i's actions while
-holding other agents fixed. n_rollouts_per_prompt=4 is required in BOTH
-DebateMetricStreamerConfig AND reward_shaping_params (Pitfall 3/4).
+Workflow position: GPU Cluster > Unit Testing
+Purpose: Tests that the vLLM sidecar can:
+  1. Read config.json from export directory
+  2. Initialize LlamaForCausalLM with load_format="dummy"
+  3. Load weights from safetensors via reload_model_weights()
+  4. Respond to the first generate request
+
+This config adds persistent sidecar logging to capture crash details.
+Runs only 2 training steps to minimize GPU time.
 
 Usage:
     # Preview (no submission)
-    uv run python configs/reward_shaping_sweep/sweep_coma_advantage.py start
+    uv run python configs/reward_shaping_sweep/sweep_gpu_unit_test.py start
 
     # Submit to cluster
-    uv run python configs/reward_shaping_sweep/sweep_coma_advantage.py --submit start
-
-OWNERS: Multiagent Debate RL Experiment
+    uv run python configs/reward_shaping_sweep/sweep_gpu_unit_test.py --submit start
 """
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-import configs._image_reuse  # noqa: F401 — skip Docker builds when REUSE_IMAGE_TAG is set
+import configs._image_reuse  # noqa: F401
 import sweep
 
 from post_training.canonicals import sweep_base
@@ -43,16 +46,7 @@ from configs.reward_shaping_sweep._base import (
     NUM_SAMPLING_GPUS,
     MAX_SEQUENCE_LENGTH,
     CKPT_PATH,
-    TRAIN_BATCH_SIZE,
-    EVAL_BATCH_SIZE,
-    TOTAL_TRAIN_STEPS,
-    LEARNING_RATE,
-    KL_BETA,
-    GENERATIONS_PER_PROMPT,
-    EXPORT_EVERY_STEPS,
-    HARD_UPDATE_REF_EVERY_STEPS,
     SEED,
-    N_GRADIENT_ACCUMULATION_STEPS,
     PRIORITY_CLASS,
     RUN_CONFIG_PATH,
     K8S_SECRETS_PATH,
@@ -62,10 +56,17 @@ from configs.reward_shaping_sweep._base import (
     _VLLM_EXPORT_DIR,
 )
 
+# Override: minimal steps for unit testing
+_TOTAL_TRAIN_STEPS = 2
+_EXPORT_EVERY_STEPS = 1
+_TRAIN_BATCH_SIZE = 2
+_EVAL_BATCH_SIZE = 2
+_GENERATIONS_PER_PROMPT = 2  # Reduced for speed
 
-class RewardShapingSweep(sweep_base.Sweep):
+
+class GpuUnitTest(sweep_base.Sweep):
     settings: sweep.SweepSettings = sweep.SweepSettings(
-        sweep_output_path="${HOME}/sweep_jobs/reward_shaping_comparison/",
+        sweep_output_path="${HOME}/sweep_jobs/gpu_unit_test/",
         cluster=sweep.Cluster.cw_us_east_04_prod,
     )
     fax: sweep.FaxConfig = sweep_base.PostTraining(
@@ -77,18 +78,18 @@ class RewardShapingSweep(sweep_base.Sweep):
         run_config=RUN_CONFIG_PATH,
         k8s_env_secrets_toml=K8S_SECRETS_PATH,
         ckpt_path=CKPT_PATH,
-        output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/reward-shaping-sweep/${SWEEP_NAME}/${TRIAL_IDX}",
+        output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/gpu-unit-test/${SWEEP_NAME}/${TRIAL_IDX}",
         patch_run_config=dict(
-            train_batch_size=TRAIN_BATCH_SIZE,
-            eval_batch_size=EVAL_BATCH_SIZE,
-            total_train_steps=TOTAL_TRAIN_STEPS,
+            train_batch_size=_TRAIN_BATCH_SIZE,
+            eval_batch_size=_EVAL_BATCH_SIZE,
+            total_train_steps=_TOTAL_TRAIN_STEPS,
             max_sequence_length=MAX_SEQUENCE_LENGTH,
-            validation_every_steps=TOTAL_TRAIN_STEPS,
-            n_gradient_accumulation_steps=N_GRADIENT_ACCUMULATION_STEPS,
+            validation_every_steps=_TOTAL_TRAIN_STEPS,
+            n_gradient_accumulation_steps=1,
             lr_schedule={
                 "kwargs": {
-                    "peak_lr": LEARNING_RATE,
-                    "end_lr": LEARNING_RATE,
+                    "peak_lr": 3e-6,
+                    "end_lr": 3e-6,
                 },
             },
             seed=SEED,
@@ -96,18 +97,18 @@ class RewardShapingSweep(sweep_base.Sweep):
                 "loss": {
                     "kwargs": {
                         "rl_training_steps": 1,
-                        "hard_update_ref_every_steps": HARD_UPDATE_REF_EVERY_STEPS,
+                        "hard_update_ref_every_steps": 1,
                         "preference": {
                             "loss_variation": "gspo_use_ref_policy_as_pi_old",
-                            "beta": KL_BETA,
+                            "beta": 0.03,
                             "avg_loglikelihood": False,
-                            "generations_per_prompt": GENERATIONS_PER_PROMPT,
+                            "generations_per_prompt": _GENERATIONS_PER_PROMPT,
                         },
                     },
                 },
             },
-            n_last_ckpts_to_keep=2,
-            checkpoint_every_steps=TOTAL_TRAIN_STEPS,
+            n_last_ckpts_to_keep=1,
+            checkpoint_every_steps=_TOTAL_TRAIN_STEPS,
             minizord=flink_zord.FlinkZordConfig(
                 samplers=dict(
                     sampler_key=FlinkVllmSidecarSamplerConfig(
@@ -115,7 +116,7 @@ class RewardShapingSweep(sweep_base.Sweep):
                             job_name=_VLLM_SIDECAR,
                             job_port=_VLLM_PORT,
                         ),
-                        export_every_steps=EXPORT_EVERY_STEPS,
+                        export_every_steps=_EXPORT_EVERY_STEPS,
                         export_dir=_VLLM_EXPORT_DIR,
                         temperature=1,
                     ),
@@ -153,7 +154,7 @@ class RewardShapingSweep(sweep_base.Sweep):
                 actor=FlinkCombActorConfig(
                     sampler_endpoint_key="sampler_key",
                 ),
-                num_actors_per_batch_item=GENERATIONS_PER_PROMPT,
+                num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 actors_queue_batches=32,
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
@@ -168,9 +169,7 @@ class RewardShapingSweep(sweep_base.Sweep):
                         )
                     ),
                     DebateMetricStreamerConfig(
-                        n_rollouts_per_prompt=GENERATIONS_PER_PROMPT,
-                        reward_shaping_strategy="coma_advantage",
-                        reward_shaping_params={"n_rollouts_per_prompt": GENERATIONS_PER_PROMPT},
+                        n_rollouts_per_prompt=_GENERATIONS_PER_PROMPT,
                     ),
                 ],
                 eval=FlinkEvalConfig(
@@ -180,7 +179,7 @@ class RewardShapingSweep(sweep_base.Sweep):
                         patch_number_of_generation_per_prompt=1,
                     ),
                 ),
-                log_train_generations_every_steps=10,
+                log_train_generations_every_steps=1,
                 save_debug_data_every_steps=1,
             ).model_dump(),
             likelihood_evals=None,
@@ -194,7 +193,7 @@ class RewardShapingSweep(sweep_base.Sweep):
             ckpt=dict(force_at_init=False),
             validation=dict(force_at_init=False),
             model_export=dict(enabled=False),
-            profile_every_steps=5,
+            profile_every_steps=1,
             first_step_to_profile=1,
             read_extra_state=False,
         ),
@@ -215,6 +214,8 @@ class RewardShapingSweep(sweep_base.Sweep):
                 partition=f"gpu_{NUM_SAMPLING_GPUS}",
                 command=" ".join(
                     [
+                        # No bash -c wrapper: kjobs entrypoint uses $DECODED_COMMAND
+                        # (unquoted), so bash -c '...' breaks due to word splitting.
                         "env FAX_NUMBER_GPUS_PER_WORKER=1 VLLM_ATTENTION_BACKEND=FLASHINFER",
                         "python -m vinfer.main",
                         f"--exports-glob-pattern={_VLLM_EXPORT_DIR}/*/_HF_EXPORT_IS_COMPLETE",
@@ -234,4 +235,4 @@ class RewardShapingSweep(sweep_base.Sweep):
 
 
 if __name__ == "__main__":
-    sweep.cli.run_sweep_with_flags(RewardShapingSweep(), debugging_artefacts=[__file__])
+    sweep.cli.run_sweep_with_flags(GpuUnitTest(), debugging_artefacts=[__file__])

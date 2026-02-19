@@ -20,6 +20,7 @@ dependencies = [
     "datasets>=3.2.0",
     "jsonlines>=4.0.0",
     "pydantic-yaml>=1.6.0",
+    "wandb>=0.25.0",
 ]
 
 [project.optional-dependencies]

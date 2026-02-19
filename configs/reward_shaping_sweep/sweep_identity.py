@@ -68,7 +68,7 @@ class RewardShapingSweep(sweep_base.Sweep):
     )
     fax: sweep.FaxConfig = sweep_base.PostTraining(
         partition=f"gpu_{NUM_TRAINING_GPUS}",
-        queue=sweep.Queue.post_training_cohere_labs_queue,
+        queue=sweep.Queue.post_training_flex_queue,
         jobs_max_fanout=1,
         wandb_project=WANDB_PROJECT,
         priority_class=PRIORITY_CLASS,
@@ -211,10 +211,13 @@ class RewardShapingSweep(sweep_base.Sweep):
                 partition=f"gpu_{NUM_SAMPLING_GPUS}",
                 command=" ".join(
                     [
+                        "env FAX_NUMBER_GPUS_PER_WORKER=1 VLLM_ATTENTION_BACKEND=FLASHINFER",
                         "python -m vinfer.main",
                         f"--exports-glob-pattern={_VLLM_EXPORT_DIR}/*/_HF_EXPORT_IS_COMPLETE",
                         f"--port {_VLLM_PORT}",
                         "--gpus-per-vllm-worker=1",
+                        f"--max-model-len {MAX_SEQUENCE_LENGTH}",
+                        "--enforce-eager",
                     ]
                 ),
                 ports=dict(web=_VLLM_PORT),

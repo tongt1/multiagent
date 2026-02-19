@@ -30,3 +30,11 @@ SMOLLM_135M = ModelProfile(
     max_sequence_length=2048,
     needs_mesh_override=False,
 )
+
+LLAMA_1B_INSTRUCT = ModelProfile(
+    ckpt_path="gs://cohere-dev-central-2/users/terry/llama-1b-instruct/ckpt-0",
+    num_training_gpus=4,
+    num_sampling_gpus=4,
+    max_sequence_length=4096,
+    needs_mesh_override=False,
+)

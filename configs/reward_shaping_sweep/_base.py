@@ -33,7 +33,7 @@ N_GRADIENT_ACCUMULATION_STEPS = 1
 PRIORITY_CLASS = "dev-low"
 
 # Paths
-RUN_CONFIG_PATH = "${HOME}/repos/post_training/post_training/experimental/comb_flink/configs/smollm_135m_rloo_math.run"
+RUN_CONFIG_PATH = "${HOME}/reward-training/run_configs/smollm_135m_rloo_math.run"
 MATH_500_DATA_PATH = "gs://cohere-dev-central-2/comb/data/math_500/2025_05_15/scenarios_train.jsonl"
 K8S_SECRETS_PATH = "${HOME}/repos/secrets_template.toml"
 WANDB_PROJECT = "multiagent-debate-rl"
