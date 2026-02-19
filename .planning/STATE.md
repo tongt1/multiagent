@@ -6,23 +6,23 @@ See: /home/terry_tong_cohere_com/cooperbench-repro/.planning/PROJECT.md (updated
 
 **Core value:** Produce verifiable figures (4, 5, 6) that replicate the CooperBench paper's key findings -- the solo-coop coordination gap, communication's failure to improve cooperation despite reducing merge conflicts, and the breakdown of communication errors -- using Command A instead of the paper's external models.
 
-**Current focus:** Phase 4 complete -- Figure Generation and Paper Comparison done. Ready for Phase 5.
+**Current focus:** PROJECT COMPLETE -- All 5 phases done. 12/12 plans executed.
 
 ## Current Position
 
-Phase: 4 (Figure Generation and Paper Comparison)
-Plan: 2 of 2 in current phase (04-02 complete -- phase done)
-Status: Phase 4 complete
-Last activity: 2026-02-18 -- Completed 04-02-PLAN.md (Figures 5 and 6 generation)
+Phase: 5 (Qualitative Transcript Analysis)
+Plan: 1 of 1 in current phase (05-01 complete -- phase done)
+Status: PROJECT COMPLETE
+Last activity: 2026-02-19 -- Completed 05-01-PLAN.md (Qualitative transcript analysis)
 
-Progress: [#######...] 73% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4: 2/2 = 11 plans complete)
+Progress: [##########] 100% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4: 2/2 + Phase 5: 1/1 = 12 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 41 min
-- Total execution time: 7 hours 34 min
+- Total plans completed: 12
+- Average duration: 38 min
+- Total execution time: 7 hours 36 min
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: [#######...] 73% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4
 | 2 | 3/3 | 218 min | 73 min |
 | 3 | 3/3 | 12 min | 4 min |
 | 4 | 2/2 | 4 min | 2 min |
+| 5 | 1/1 | 2 min | 2 min |
 
 **Recent Trend:**
 - 01-01: 4 min (2 tasks, 2 files)
@@ -45,6 +46,7 @@ Progress: [#######...] 73% (Phase 1: 3/3 + Phase 2: 3/3 + Phase 3: 3/3 + Phase 4
 - 03-03: 6 min (2 tasks, 2 files)
 - 04-01: 2 min (2 tasks, 4 files)
 - 04-02: 2 min (2 tasks, 6 files)
+- 05-01: 2 min (2 tasks, 2 files)
 
 *Updated after each plan completion*
 
@@ -89,6 +91,11 @@ Recent decisions affecting current work:
 - Figure 6 categories ordered by paper grouping (C4a,C4b,C1a,C1b,C2,C3b) for visual clustering of bracket groups
 - Grouping brackets drawn below x-axis with colored lines and centered labels for paper category mapping
 - Paper baselines shown as dashed reference lines (Fig 5 panel b) and annotation box (Fig 6) -- different visualization for different data types
+- Reuse exact classify_speech_act from analyze_fig5.py for Phase 5 consistency (do not improve the classifier)
+- Store infinite Plan:Question ratios as None (JSON null), run Mann-Whitney U on finite ratios only
+- Report counter-intuitive findings accurately: conflict trajectories have HIGHER planning rates and P:Q ratios -- do not imply causation
+- Include small-sample caveat for n=11 no-plan-first group in Fisher's exact test results
+- Note line mention sparsity (1/428 messages) rather than omitting the metric
 
 ### Pending Todos
 
@@ -209,13 +216,25 @@ Publication-quality Figure 6 generated as PDF (TrueType fonts) and PNG (300 DPI)
 - Output files: `figures/fig6_error_taxonomy.{pdf,png}`
 - Script: `scripts/generate_fig6.py`
 
+### Qualitative Transcript Analysis (Phase 5 Output)
+
+| Metric | No Conflict (n=59) | Conflict (n=41) | p-value | Direction |
+|--------|-------------------|-----------------|---------|-----------|
+| P:Q ratio (mean, finite) | 1.15 | 1.96 | 0.0016 | Higher ratio -> more conflicts |
+| First-turn planning rate | 83.1% | 97.6% | 0.0249 | Plan-first -> more conflicts |
+| File mentions/trajectory | 3.61 | 3.61 | 0.9173 | No difference |
+| Line mentions/trajectory | 0.017 | 0.000 | sparse | Insufficient data |
+
+Key insight: Conflict trajectories show MORE planning behavior (counter-intuitive). Likely reflects that tasks where agents plan to modify overlapping files generate both more plan messages AND more conflicts.
+Data files: `scripts/analyze_qualitative.py`, `data/qualitative_metrics.json`
+
 ## Session Continuity
 
-Last session: 2026-02-18
-Stopped at: Completed 04-02-PLAN.md (Figures 5 and 6 generation -- Phase 4 complete)
+Last session: 2026-02-19
+Stopped at: Completed 05-01-PLAN.md (Qualitative transcript analysis -- Phase 5 complete -- PROJECT COMPLETE)
 Resume file: None
-Next action: Phase 5 (Qualitative Transcript Analysis) if needed
+Next action: None -- all 12 plans across 5 phases complete
 
 ---
 *State initialized: 2026-02-14*
-*Last updated: 2026-02-18 (04-02 complete, Phase 4 done)*
+*Last updated: 2026-02-19 (05-01 complete, Phase 5 done, PROJECT COMPLETE)*

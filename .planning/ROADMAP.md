@@ -114,7 +114,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md -- Compute qualitative metrics (P:Q ratio, first-turn planning, specificity) and correlate with merge outcomes
+- [x] 05-01-PLAN.md -- Compute qualitative metrics (P:Q ratio, first-turn planning, specificity) and correlate with merge outcomes
 
 **Success Criteria:**
 1. Plan:Question ratio is computed per trajectory and its correlation with merge conflict outcomes is reported (e.g., higher planning correlates with fewer conflicts).
@@ -132,10 +132,10 @@ Plans:
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
 | 3 | Analysis Modules | Complete | 10 | 3/3 |
 | 4 | Figure Generation and Paper Comparison | Complete | 4 | 2/2 |
-| 5 | Qualitative Transcript Analysis | Planned | 4 | 0/1 |
+| 5 | Qualitative Transcript Analysis | Complete | 4 | 1/1 |
 
-**Total:** 27/30 requirements complete
+**Total:** 30/30 requirements complete -- PROJECT COMPLETE
 
 ---
 *Roadmap created: 2026-02-14*
-*Last updated: 2026-02-18 (04-02 complete: Phase 4 done, all 3 figures generated)*
+*Last updated: 2026-02-19 (05-01 complete: Phase 5 done, all 5 phases complete, PROJECT COMPLETE)*

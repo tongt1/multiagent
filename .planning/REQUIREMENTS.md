@@ -49,10 +49,10 @@ Requirements for initial reproduction. Each maps to roadmap phases.
 
 ### Qualitative Analysis
 
-- [ ] **QUAL-01**: Compute Plan:Question ratio per trajectory and correlate with merge conflict outcomes
-- [ ] **QUAL-02**: Detect first-turn planning (Plan message in first turn) and measure conflict rate reduction
-- [ ] **QUAL-03**: Count specificity metrics per trajectory (line number mentions, file path mentions)
-- [ ] **QUAL-04**: Generate summary table comparing qualitative metrics for conflict vs no-conflict trajectories
+- [x] **QUAL-01**: Compute Plan:Question ratio per trajectory and correlate with merge conflict outcomes
+- [x] **QUAL-02**: Detect first-turn planning (Plan message in first turn) and measure conflict rate reduction
+- [x] **QUAL-03**: Count specificity metrics per trajectory (line number mentions, file path mentions)
+- [x] **QUAL-04**: Generate summary table comparing qualitative metrics for conflict vs no-conflict trajectories
 
 ### Paper Comparison
 
@@ -116,10 +116,10 @@ Deferred to future work. Tracked but not in current roadmap.
 | FIG6-01 | Phase 3 | Complete |
 | FIG6-02 | Phase 3 | Complete |
 | FIG6-03 | Phase 4 | Complete |
-| QUAL-01 | Phase 5 | Pending |
-| QUAL-02 | Phase 5 | Pending |
-| QUAL-03 | Phase 5 | Pending |
-| QUAL-04 | Phase 5 | Pending |
+| QUAL-01 | Phase 5 | Complete |
+| QUAL-02 | Phase 5 | Complete |
+| QUAL-03 | Phase 5 | Complete |
+| QUAL-04 | Phase 5 | Complete |
 | COMP-01 | Phase 4 | Complete |
 
 **Coverage:**
@@ -129,4 +129,4 @@ Deferred to future work. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-18 after 04-02-PLAN.md completion (FIG5-05, FIG6-03 complete -- Phase 4 done)*
+*Last updated: 2026-02-19 after 05-01-PLAN.md completion (QUAL-01 through QUAL-04 complete -- Phase 5 done -- PROJECT COMPLETE)*
