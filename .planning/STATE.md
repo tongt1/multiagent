@@ -2,38 +2,38 @@
 
 ## Project Reference
 
-See: /home/terry_tong_cohere_com/.planning/PROJECT.md (updated 2026-02-02)
+See: .planning/PROJECT.md (updated 2026-02-14)
 
-**Core value:** Produce rigorous, reproducible comparisons between multi-agent debate RL and single-agent RLVR on math reasoning, with the only variable being how training data is generated (debate vs no debate).
-
-**Current focus:** Phase 8 - Reward Shaping
+**Core value:** All 5 reward strategies must be fully wired end-to-end so shaped rewards affect gradient updates and produce meaningful WandB comparison curves.
+**Current focus:** Phase 3 - Observability and Comparison
 
 ## Current Position
 
-Phase: 8 (Reward Shaping)
-Plan: 4 of 4 in current phase (complete)
-Status: Phase 8 complete
-Last activity: 2026-02-12 — Completed 08-04-PLAN.md (Reward Shaping Integration)
+Phase: 3 of 3 (Observability and Comparison) -- Plan 02 Task 1 complete, checkpoint pending
+Plan: 2 of 2 in current phase
+Status: Plan 03-02 Task 1 complete, Task 2 awaiting human verification (checkpoint:human-verify)
+Last activity: 2026-02-14 -- Completed 03-02 Task 1 (batch submission script + WANDB_PROJECT tests)
 
-Progress: [██████████] 100% (Phase 8: 4/4 plans)
+Progress: [#############░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 3 min
-- Total execution time: 0.17 hours
+- Total plans completed: 4 (03-02 Task 1 done, checkpoint pending)
+- Average duration: 4.4min
+- Total execution time: 0.37 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-data-generation-foundation | 2 | 8 min | 4 min |
-| 08-reward-shaping | 1 | 2 min | 2 min |
+| 01-end-to-end-reward-integration | 2 | 11min | 5.5min |
+| 02-experiment-configuration | 1 | 6min | 6min |
+| 03-observability-and-comparison | 1+1T1 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (4min), 08-04 (2min)
-- Trend: Improving velocity
+- Last 5 plans: 5min, 6min, 6min, 3min, 2min
+- Trend: Accelerating, 2min for Plan 03-02 Task 1
 
 *Updated after each plan completion*
 
@@ -41,48 +41,44 @@ Progress: [██████████] 100% (Phase 8: 4/4 plans)
 
 ### Decisions
 
-Decisions are logged in /home/terry_tong_cohere_com/.planning/PROJECT.md Key Decisions table.
+Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- POST_TRAINING as backend, not full replacement: Scaffold controls training loop for flexibility; POST_TRAINING handles infra concerns
-- BEE for both reward and eval: Single eval system for consistency between training signal and benchmark evaluation
-- Math-only for initial experiments: Verifiable rewards are cleanest for math; reduces variables
-- Single-agent RLVR as sole baseline: Isolates the effect of multi-agent debate on training data quality
-- REINFORCE/GRPO only initially: Simpler algorithms reduce debugging surface for initial comparison
-
-**From 01-01 (MATH 500 loader):**
-- Fixed random seed (42) for reproducible sampling: Ensures consistent 500 problems across experiments
-- Filter before sampling: Remove ambiguous answers before stratification to guarantee all 500 are SymPy-verifiable
-- Stratified sampling with redistribution: 100 per level with overflow redistribution maintains balance
-- Cache to data/math500_cache.json: First load creates cache, subsequent loads instant
-
-**From 01-02 (Ground truth rewards and early termination):**
-- Binary ground truth reward (1.0/0.0) computed via compute_math_reward when problem_metadata contains ground_truth
-- max_iterations changed from 7 to 5 as decided for Phase 1 MATH 500 generation
-- PipelineConfig.mode field controls debate (1-solver) vs baseline (3-solver) architecture
-- Termination metadata logged in trajectory for RLVR analysis of early vs max iteration stops
-
-**From 08-04 (Reward Shaping Integration):**
-- Shaped rewards logged as additional debate/shaped_reward/* metrics alongside unshaped originals for backward compatibility
-- Reward shaping config co-located in DebateMetricStreamerConfig rather than separate config class
-- Error handling wraps reward shaping to prevent failures from breaking training pipeline
+- SmolLM-135M chosen for fast iteration (minutes not hours)
+- All 5 strategies in single comparison with same hyperparams
+- Default strategy hyperparams (no per-strategy tuning in v1)
+- Refactored _compute_shaped_reward_metrics to _compute_and_apply_shaped_rewards returning (metrics, shaped_per_item) tuple
+- Judge items always receive 0.0 reward regardless of strategy type
+- Missing role in per-role dict falls back to raw reward
+- Original dtype preserved via np.array(value, dtype=original_dtype)
+- Used torch.backward() for gradient-norm comparison per locked decisions R12/R13
+- atol=1e-6, rtol=1e-5 tolerances for identity regression per user decision
+- Invalid strategy name errors at __init__() time (fail fast), not at runtime
+- AST/text-based test validation for SWEEP configs (sweep module unavailable locally)
+- Shared _base.py module guarantees ECFG-06 (identical hyperparams except reward shaping)
+- Used sys.modules mock pattern for wandb tests since wandb is not installed locally
+- Placed _update_wandb_config() call after workspace init in first get() to ensure wandb.run exists
+- Used mutually exclusive argparse group for --dry-run/--submit/--validate to prevent ambiguous invocations
+- Deferred wandb import to validate_runs() since wandb not installed locally
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-**From 01-01:**
-- MATH dataset DMCA-restricted on HuggingFace: Local fallback implemented but may need local data/MATH/test/ files for production use beyond mocked tests
+- RESOLVED: Reward shaping strategies now wired into DebateMetricStreamer with write-back to item.data["rewards"]
+- RESOLVED: Identity regression and gradient-path liveness verified via 13 integration tests
+- RESOLVED: DebateMetricStreamerConfig reward_shaping_strategy/params fields now uncommented in 5 strategy-specific SWEEP configs
+- RESOLVED: All 5 configs verified identical except for reward shaping fields (85 tests, ECFG-01 through ECFG-08)
+- RESOLVED: Shaped reward metrics centralized as METRIC_SHAPED_REWARD_* constants, hardcoded strings replaced
+- RESOLVED: wandb.config.update() surfaces reward_shaping_strategy for WandB run filtering
+- RESOLVED: Batch submission script created with --dry-run, --submit, --validate modes
+- RESOLVED: All 5 configs share WANDB_PROJECT constant (12 additional tests, 102 total)
+- CHECKPOINT: Plan 03-02 Task 2 -- user must submit all 5 runs and verify WandB dashboard
 
 ## Session Continuity
 
-Last session: 2026-02-12 03:22:12 UTC
-Stopped at: Completed 08-04-PLAN.md (Reward Shaping Integration)
-Resume file: None
-Next action: Phase 8 complete. Begin next milestone phase or run experiments with reward shaping strategies.
-
----
-*State initialized: 2026-02-02*
-*Last updated: 2026-02-12*
+Last session: 2026-02-14
+Stopped at: Completed 03-02-PLAN.md Task 1 (batch submission script + WANDB_PROJECT tests). Checkpoint pending for Task 2 (human-verify).
+Resume file: .planning/phases/03-observability-and-comparison/03-02-SUMMARY.md

@@ -124,6 +124,25 @@ METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD = (
 """Mean reward of items after rollout strategy selection/modification."""
 
 # ============================================================================
+# Shaped Reward Metrics
+# ============================================================================
+
+METRIC_SHAPED_REWARD_MEAN = f"{DEBATE_PREFIX}shaped_reward/mean"
+"""Mean shaped reward across batch."""
+
+METRIC_SHAPED_REWARD_SOLVER = f"{DEBATE_PREFIX}shaped_reward/solver"
+"""Per-role shaped reward for solver."""
+
+METRIC_SHAPED_REWARD_VERIFIER = f"{DEBATE_PREFIX}shaped_reward/verifier"
+"""Per-role shaped reward for verifier."""
+
+METRIC_SHAPED_REWARD_JUDGE = f"{DEBATE_PREFIX}shaped_reward/judge"
+"""Per-role shaped reward for judge."""
+
+METRIC_SHAPED_REWARD_STRATEGY_ACTIVE = f"{DEBATE_PREFIX}shaped_reward/strategy_active"
+"""0.0 for identity strategy, 1.0 for others."""
+
+# ============================================================================
 # GPU Utilization Metrics (from GPUStatsStreamer)
 # ============================================================================
 
@@ -317,5 +336,12 @@ ALL_DEBATE_METRICS = [
     METRIC_ROLLOUT_STRATEGY_ITEMS_OUT,
     METRIC_ROLLOUT_STRATEGY_SELECTION_RATIO,
     METRIC_ROLLOUT_STRATEGY_MEAN_SELECTED_REWARD,
+
+    # Shaped rewards
+    METRIC_SHAPED_REWARD_MEAN,
+    METRIC_SHAPED_REWARD_SOLVER,
+    METRIC_SHAPED_REWARD_VERIFIER,
+    METRIC_SHAPED_REWARD_JUDGE,
+    METRIC_SHAPED_REWARD_STRATEGY_ACTIVE,
 ]
 """All debate metric names for validation and documentation."""

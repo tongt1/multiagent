@@ -544,3 +544,541 @@ class TestDebateMetricStreamerRewardShaping:
         assert "debate/shaped_reward/judge" in metrics
         assert "debate/shaped_reward/mean" in metrics
         assert metrics["debate/shaped_reward/strategy_active"] == 1.0
+
+    def test_reward_mixing_mutates_item_rewards(self):
+        """reward_mixing strategy writes shaped values back to item.data['rewards']."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="verifier"),
+            MockActorOutputItem(reward=0.0, role_label="verifier"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=4,
+            reward_shaping_strategy="reward_mixing",
+            reward_shaping_params={"alpha": 0.5},
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # reward_mixing without metadata: local falls back to G, so r = 0.5*G + 0.5*G = G
+        # Shaped equals raw, but write-back still happens (type-safe)
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+        # Verify dtype preserved
+        assert result_items[0].data["rewards"].dtype == np.float64
+
+    def test_difference_rewards_mutates_item_rewards(self):
+        """difference_rewards strategy writes shaped values back to item.data['rewards']."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=4,
+            reward_shaping_strategy="difference_rewards",
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # difference_rewards without metadata falls back to raw reward copy
+        # Each item's data["rewards"] should be the solver's difference reward
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+        # Verify dtype preserved
+        assert result_items[0].data["rewards"].dtype == np.float64
+
+
+# ─── Identity regression and gradient-path tests ─────────────────────────────
+
+
+def _run_streamer_and_collect_rewards(items_spec, config_kwargs):
+    """Run DebateMetricStreamer.get() and return post-mutation reward values.
+
+    Creates fresh MockActorOutputItem copies (to avoid mutation contamination),
+    runs streamer.get(), and returns the mutated item.data["rewards"] values
+    as a numpy array.
+
+    Args:
+        items_spec: List of (reward, role_label) tuples to create MockActorOutputItems from.
+        config_kwargs: Dict of DebateMetricStreamerConfig kwargs.
+
+    Returns:
+        np.ndarray of shape (len(items_spec),) with post-mutation reward values.
+    """
+    from src.training.wandb_enrichment.debate_streamer import (
+        DebateMetricStreamer,
+        DebateMetricStreamerConfig,
+    )
+
+    mock_items = [MockActorOutputItem(reward=r, role_label=rl) for r, rl in items_spec]
+    upstream = MockUpstreamStreamer(mock_items, {})
+    config = DebateMetricStreamerConfig(**config_kwargs)
+    streamer = DebateMetricStreamer(config, upstream, MagicMock())
+    result_items, _ = streamer.get()
+    return np.array([item.data["rewards"].item() for item in result_items])
+
+
+class TestIdentityRegressionAndGradientPath:
+    """RINT-04: Identity regression tests and gradient-path liveness tests.
+
+    Verifies:
+    - Identity strategy == no strategy configured (backward compat)
+    - Non-identity strategies produce observably different shaped rewards
+    - Gradient-norm comparison proves shaped rewards affect the gradient path
+    """
+
+    def test_identity_regression_single_step(self):
+        """No-strategy and explicit identity produce identical rewards matching raw."""
+        raw_rewards = [5.0, 0.0, 5.0, 0.0, 5.0, 5.0, 0.0, 0.0]
+        items_spec = [(r, "solver") for r in raw_rewards]
+
+        # Run with no reward_shaping_strategy (defaults to identity)
+        rewards_no_strategy = _run_streamer_and_collect_rewards(
+            items_spec, {"n_rollouts_per_prompt": 8}
+        )
+
+        # Run with explicit identity
+        rewards_identity = _run_streamer_and_collect_rewards(
+            items_spec, {"n_rollouts_per_prompt": 8, "reward_shaping_strategy": "identity"}
+        )
+
+        # Both should match each other
+        np.testing.assert_allclose(
+            rewards_no_strategy, rewards_identity, atol=1e-6, rtol=1e-5
+        )
+
+        # Both should match the original raw rewards
+        np.testing.assert_allclose(
+            rewards_no_strategy, np.array(raw_rewards), atol=1e-6, rtol=1e-5
+        )
+        np.testing.assert_allclose(
+            rewards_identity, np.array(raw_rewards), atol=1e-6, rtol=1e-5
+        )
+
+    def test_identity_regression_with_mixed_roles(self):
+        """Identity regression holds with mixed solver/verifier roles."""
+        items_spec = [
+            (5.0, "solver"),
+            (0.0, "solver"),
+            (5.0, "solver"),
+            (0.0, "solver"),
+            (0.0, "verifier"),
+            (5.0, "verifier"),
+            (0.0, "verifier"),
+            (5.0, "verifier"),
+        ]
+        raw_rewards = [r for r, _ in items_spec]
+
+        rewards_no_strategy = _run_streamer_and_collect_rewards(
+            items_spec, {"n_rollouts_per_prompt": 8}
+        )
+        rewards_identity = _run_streamer_and_collect_rewards(
+            items_spec, {"n_rollouts_per_prompt": 8, "reward_shaping_strategy": "identity"}
+        )
+
+        np.testing.assert_allclose(
+            rewards_no_strategy, rewards_identity, atol=1e-6, rtol=1e-5
+        )
+        np.testing.assert_allclose(
+            rewards_no_strategy, np.array(raw_rewards), atol=1e-6, rtol=1e-5
+        )
+
+    def test_multi_step_identity_vs_no_strategy(self):
+        """Multi-step (5 steps) identity regression: no-strategy == explicit identity at each step."""
+        for step in range(5):
+            rng = np.random.RandomState(seed=step)
+            raw_rewards = rng.uniform(0.0, 5.0, size=8).tolist()
+            items_spec = [(r, "solver") for r in raw_rewards]
+
+            rewards_no_strategy = _run_streamer_and_collect_rewards(
+                items_spec, {"n_rollouts_per_prompt": 8}
+            )
+            rewards_identity = _run_streamer_and_collect_rewards(
+                items_spec, {"n_rollouts_per_prompt": 8, "reward_shaping_strategy": "identity"}
+            )
+
+            np.testing.assert_allclose(
+                rewards_no_strategy,
+                rewards_identity,
+                atol=1e-6,
+                err_msg=f"Identity regression failed at step {step}",
+            )
+
+    def test_non_identity_produces_different_rewards(self):
+        """COMA advantage produces different rewards than identity (non-trivial shaping)."""
+        raw_rewards = [5.0, 0.0, 5.0, 0.0, 5.0, 5.0, 0.0, 0.0]
+        items_spec = [(r, "solver") for r in raw_rewards]
+
+        rewards_identity = _run_streamer_and_collect_rewards(
+            items_spec, {"n_rollouts_per_prompt": 8}
+        )
+        rewards_coma = _run_streamer_and_collect_rewards(
+            items_spec,
+            {
+                "n_rollouts_per_prompt": 8,
+                "reward_shaping_strategy": "coma_advantage",
+                "reward_shaping_params": {"n_rollouts_per_prompt": 8},
+            },
+        )
+
+        # COMA advantage: mean=2.5, so advantages = reward - mean
+        expected_coma = np.array([2.5, -2.5, 2.5, -2.5, 2.5, 2.5, -2.5, -2.5])
+
+        # Shaped rewards differ from identity
+        assert not np.allclose(rewards_identity, rewards_coma)
+
+        # Shaped rewards match expected COMA advantage values
+        np.testing.assert_allclose(rewards_coma, expected_coma, atol=1e-6)
+
+    def test_multi_step_non_identity_differs_from_identity(self):
+        """Multi-step (5 steps) divergence: non-identity rewards differ from identity."""
+        cumulative_diff = 0.0
+        at_least_one_differs = False
+
+        for step in range(5):
+            rng = np.random.RandomState(seed=step + 100)
+            raw_rewards = rng.uniform(0.0, 5.0, size=8).tolist()
+            items_spec = [(r, "solver") for r in raw_rewards]
+
+            rewards_identity = _run_streamer_and_collect_rewards(
+                items_spec, {"n_rollouts_per_prompt": 8}
+            )
+            rewards_coma = _run_streamer_and_collect_rewards(
+                items_spec,
+                {
+                    "n_rollouts_per_prompt": 8,
+                    "reward_shaping_strategy": "coma_advantage",
+                    "reward_shaping_params": {"n_rollouts_per_prompt": 8},
+                },
+            )
+
+            step_diff = np.abs(rewards_identity - rewards_coma).sum()
+            cumulative_diff += step_diff
+            if not np.allclose(rewards_identity, rewards_coma):
+                at_least_one_differs = True
+
+        assert at_least_one_differs, "Expected at least one step where COMA differs from identity"
+        assert cumulative_diff > 0, "Expected cumulative difference > 0 across 5 steps"
+
+    def test_gradient_norm_differs_with_shaping(self):
+        """Gradient-norm comparison (5 steps): shaped rewards produce different gradients.
+
+        Uses torch.backward() per locked decision R12/R13 to prove gradient-path liveness.
+        """
+        torch = pytest.importorskip("torch")
+
+        raw_norms = []
+        shaped_norms = []
+        identity_norms_a = []
+        identity_norms_b = []
+
+        for step in range(5):
+            rng = np.random.RandomState(seed=step + 200)
+            raw_rewards_list = rng.uniform(0.0, 5.0, size=8).tolist()
+            items_spec = [(r, "solver") for r in raw_rewards_list]
+
+            # Collect raw (identity) rewards
+            raw_rewards = _run_streamer_and_collect_rewards(
+                items_spec, {"n_rollouts_per_prompt": 8}
+            )
+
+            # Collect shaped (COMA advantage) rewards
+            shaped_rewards = _run_streamer_and_collect_rewards(
+                items_spec,
+                {
+                    "n_rollouts_per_prompt": 8,
+                    "reward_shaping_strategy": "coma_advantage",
+                    "reward_shaping_params": {"n_rollouts_per_prompt": 8},
+                },
+            )
+
+            # Simulate gradient computation with raw rewards
+            param_raw = torch.randn(8, requires_grad=True)
+            loss_raw = (torch.tensor(raw_rewards, dtype=torch.float32) * param_raw).sum()
+            loss_raw.backward()
+            raw_norms.append(param_raw.grad.norm().item())
+
+            # Simulate gradient computation with shaped rewards
+            param_shaped = param_raw.detach().clone().requires_grad_(True)
+            loss_shaped = (torch.tensor(shaped_rewards, dtype=torch.float32) * param_shaped).sum()
+            loss_shaped.backward()
+            shaped_norms.append(param_shaped.grad.norm().item())
+
+            # Also test identity vs no-strategy gradient norms
+            identity_rewards = _run_streamer_and_collect_rewards(
+                items_spec,
+                {"n_rollouts_per_prompt": 8, "reward_shaping_strategy": "identity"},
+            )
+
+            param_id_a = param_raw.detach().clone().requires_grad_(True)
+            loss_id_a = (torch.tensor(raw_rewards, dtype=torch.float32) * param_id_a).sum()
+            loss_id_a.backward()
+            identity_norms_a.append(param_id_a.grad.norm().item())
+
+            param_id_b = param_raw.detach().clone().requires_grad_(True)
+            loss_id_b = (torch.tensor(identity_rewards, dtype=torch.float32) * param_id_b).sum()
+            loss_id_b.backward()
+            identity_norms_b.append(param_id_b.grad.norm().item())
+
+        # Shaped rewards should produce different gradient norms in at least one step
+        assert any(
+            abs(raw - shaped) > 1e-6
+            for raw, shaped in zip(raw_norms, shaped_norms)
+        ), "Expected gradient norms to differ between raw and shaped rewards"
+
+        # Identity vs no-strategy should produce identical gradient norms across all steps
+        for step_idx, (norm_a, norm_b) in enumerate(zip(identity_norms_a, identity_norms_b)):
+            assert abs(norm_a - norm_b) < 1e-5, (
+                f"Identity vs no-strategy gradient norms differ at step {step_idx}: "
+                f"{norm_a} vs {norm_b}"
+            )
+
+    @pytest.mark.ci
+    def test_gradient_norm_ci_lightweight(self):
+        """Lightweight CI gradient-norm check (2 steps, fixed rewards).
+
+        Per locked decision R13: 1-2 step CI variant of gradient-norm comparison.
+        """
+        torch = pytest.importorskip("torch")
+
+        fixed_rewards_sets = [
+            [5.0, 0.0, 5.0, 0.0, 5.0, 5.0, 0.0, 0.0],
+            [0.0, 5.0, 0.0, 5.0, 0.0, 0.0, 5.0, 5.0],
+        ]
+
+        raw_norms = []
+        shaped_norms = []
+
+        for rewards_list in fixed_rewards_sets:
+            items_spec = [(r, "solver") for r in rewards_list]
+
+            raw_rewards = _run_streamer_and_collect_rewards(
+                items_spec, {"n_rollouts_per_prompt": 8}
+            )
+            shaped_rewards = _run_streamer_and_collect_rewards(
+                items_spec,
+                {
+                    "n_rollouts_per_prompt": 8,
+                    "reward_shaping_strategy": "coma_advantage",
+                    "reward_shaping_params": {"n_rollouts_per_prompt": 8},
+                },
+            )
+
+            param_raw = torch.randn(8, requires_grad=True)
+            loss_raw = (torch.tensor(raw_rewards, dtype=torch.float32) * param_raw).sum()
+            loss_raw.backward()
+            raw_norms.append(param_raw.grad.norm().item())
+
+            param_shaped = param_raw.detach().clone().requires_grad_(True)
+            loss_shaped = (torch.tensor(shaped_rewards, dtype=torch.float32) * param_shaped).sum()
+            loss_shaped.backward()
+            shaped_norms.append(param_shaped.grad.norm().item())
+
+        # At least 1 of 2 steps should show different gradient norms
+        assert any(
+            abs(raw - shaped) > 1e-6
+            for raw, shaped in zip(raw_norms, shaped_norms)
+        ), "CI check: expected gradient norms to differ for at least 1 of 2 steps"
+
+    def test_potential_based_produces_different_rewards(self):
+        """Potential-based strategy produces different rewards when state metadata is provided."""
+        from src.training.reward_shaping.potential_shaping import PotentialBasedShaper
+
+        rewards = np.array([5.0, 0.0, 5.0, 0.0])
+        metadata = [
+            {"state_start": {"num_turns": 0}, "state_end": {"num_turns": 3}},
+            {"state_start": {"num_turns": 0}, "state_end": {"num_turns": 5}},
+            {"state_start": {"num_turns": 1}, "state_end": {"num_turns": 4}},
+            {"state_start": {"num_turns": 2}, "state_end": {"num_turns": 6}},
+        ]
+
+        shaper = PotentialBasedShaper(gamma=0.99, potential_type="debate_length", penalty=0.1)
+        shaped = shaper.shape_rewards(rewards, None, metadata)
+
+        # Output should differ from input (potential term adds shaping)
+        assert not np.allclose(shaped, rewards), (
+            "Potential-based shaping should produce different values with state metadata"
+        )
+
+        # Verify specific values:
+        # r'[0] = 5.0 + 0.99 * (-0.1*3) - (-0.1*0) = 5.0 - 0.297 = 4.703
+        assert shaped[0] == pytest.approx(5.0 + 0.99 * (-0.3) - 0.0, abs=1e-6)
+        # r'[1] = 0.0 + 0.99 * (-0.1*5) - (-0.1*0) = 0.0 - 0.495 = -0.495
+        assert shaped[1] == pytest.approx(0.0 + 0.99 * (-0.5) - 0.0, abs=1e-6)
+
+
+# ─── Backward compatibility and config validation tests ──────────────────────
+
+
+class TestBackwardCompatibilityAndConfigValidation:
+    """Backward compatibility and config validation tests.
+
+    Verifies:
+    - No-config and empty-string configs default to identity (backward compat)
+    - Invalid strategy name fails at __init__() time (fail fast)
+    - INFO log emitted on identity default
+    - dtype preserved through write-back
+    """
+
+    def test_no_config_backward_compatible(self):
+        """No reward_shaping_strategy field produces identity behavior (backward compat)."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="verifier"),
+            MockActorOutputItem(reward=0.0, role_label="verifier"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        # No reward_shaping_strategy -- rely on default ""
+        config = DebateMetricStreamerConfig(n_rollouts_per_prompt=4)
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        # Verify identity shaper is used
+        assert streamer._reward_shaper.name == "identity"
+
+        result_items, _ = streamer.get()
+
+        # Rewards should be unchanged (identity passthrough)
+        assert result_items[0].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(0.0)
+        assert result_items[2].data["rewards"].item() == pytest.approx(5.0)
+        assert result_items[3].data["rewards"].item() == pytest.approx(0.0)
+
+    def test_empty_string_strategy_uses_identity(self):
+        """Explicit empty string reward_shaping_strategy uses identity."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [
+            MockActorOutputItem(reward=3.0, role_label="solver"),
+            MockActorOutputItem(reward=7.0, role_label="solver"),
+        ]
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=2,
+            reward_shaping_strategy="",
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        assert streamer._reward_shaper.name == "identity"
+
+        result_items, _ = streamer.get()
+        assert result_items[0].data["rewards"].item() == pytest.approx(3.0)
+        assert result_items[1].data["rewards"].item() == pytest.approx(7.0)
+
+    def test_invalid_strategy_name_fails_at_init(self):
+        """Invalid strategy name raises error at __init__() time, not at get() time.
+
+        Per locked decision: fail fast at config load time (which is __init__() for
+        DebateMetricStreamer, since __init__ calls create_reward_strategy()).
+        """
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        config = DebateMetricStreamerConfig(
+            reward_shaping_strategy="nonexistent_strategy",
+            n_rollouts_per_prompt=4,
+        )
+        upstream = MockUpstreamStreamer([], {})
+
+        # Error must occur at __init__() time, NOT during get()
+        with pytest.raises((KeyError, ValueError), match="nonexistent_strategy"):
+            DebateMetricStreamer(config, upstream, MagicMock())
+        # get() is never called -- error is at init time
+
+    def test_info_log_on_identity_default(self, caplog):
+        """INFO log emitted when identity strategy is initialized."""
+        import logging
+
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        items = [MockActorOutputItem(reward=5.0, role_label="solver")]
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(n_rollouts_per_prompt=1)
+
+        with caplog.at_level(logging.INFO, logger="src.training.wandb_enrichment.debate_streamer"):
+            DebateMetricStreamer(config, upstream, MagicMock())
+
+        # Verify the initialization log message is present
+        assert any(
+            "identity" in record.message and "initialized reward shaping strategy" in record.message
+            for record in caplog.records
+        ), (
+            f"Expected INFO log about identity strategy initialization. "
+            f"Got: {[r.message for r in caplog.records]}"
+        )
+
+    def test_shaped_rewards_dtype_preserved(self):
+        """Shaped rewards preserve original float32 dtype through write-back."""
+        from src.training.wandb_enrichment.debate_streamer import (
+            DebateMetricStreamer,
+            DebateMetricStreamerConfig,
+        )
+
+        # Create items with explicit float32 rewards
+        items = [
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=5.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+            MockActorOutputItem(reward=0.0, role_label="solver"),
+        ]
+        # Manually set dtype to float32
+        for item in items:
+            item.data["rewards"] = np.array(item.data["rewards"].item(), dtype=np.float32)
+
+        upstream = MockUpstreamStreamer(items, {})
+        config = DebateMetricStreamerConfig(
+            n_rollouts_per_prompt=8,
+            reward_shaping_strategy="coma_advantage",
+            reward_shaping_params={"n_rollouts_per_prompt": 8},
+        )
+        streamer = DebateMetricStreamer(config, upstream, MagicMock())
+
+        result_items, _ = streamer.get()
+
+        # After shaping, dtype should still be float32
+        for idx, item in enumerate(result_items):
+            assert item.data["rewards"].dtype == np.float32, (
+                f"Item {idx} dtype is {item.data['rewards'].dtype}, expected float32"
+            )

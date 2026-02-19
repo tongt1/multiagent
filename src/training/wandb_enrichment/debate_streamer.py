@@ -39,6 +39,15 @@ from src.training.wandb_enrichment.debate_metrics import (
     compute_zero_advantage_metrics,
 )
 
+# Import shaped reward metric constants
+from src.training.wandb_enrichment.metric_schema import (
+    METRIC_SHAPED_REWARD_MEAN,
+    METRIC_SHAPED_REWARD_SOLVER,
+    METRIC_SHAPED_REWARD_VERIFIER,
+    METRIC_SHAPED_REWARD_JUDGE,
+    METRIC_SHAPED_REWARD_STRATEGY_ACTIVE,
+)
+
 # Conditional imports for Flink infrastructure (not available in local testing)
 if TYPE_CHECKING:
     from post_training.flink import flink_types
@@ -89,6 +98,7 @@ class _DebateMetricStreamerImpl:
         self._upstream = upstream
         self._metrics_collector = metrics_collector
         self._get_count = 0  # Track get() calls for rollout table logging
+        self._logged_mutation = False  # Log shaped reward write-back only once
 
         # Initialize reward shaping strategy from config (Phase 8)
         reward_shaping_config = None
@@ -116,13 +126,32 @@ class _DebateMetricStreamerImpl:
             f"DebateMetricStreamer: using rollout strategy: {self._rollout_strategy.name}"
         )
 
+    def _update_wandb_config(self):
+        """Surface reward shaping config as top-level WandB run config keys."""
+        try:
+            import wandb
+            if wandb.run is not None:
+                wandb.config.update({
+                    "reward_shaping_strategy": self._reward_shaper.name,
+                    "reward_shaping_params": getattr(self._config, "reward_shaping_params", {}) or {},
+                }, allow_val_change=True)
+                logger.info(
+                    f"DebateMetricStreamer: updated WandB config with "
+                    f"reward_shaping_strategy='{self._reward_shaper.name}'"
+                )
+        except Exception as e:
+            logger.warning(f"DebateMetricStreamer: failed to update WandB config: {e}")
+
     def get(self):
         """Fetch items from upstream and enrich with debate metrics.
 
-        Also handles rollout table logging and workspace initialization.
+        Also handles rollout table logging, workspace initialization,
+        and shaped reward write-back into item.data["rewards"].
 
         Returns:
             Tuple of (items, metrics) where metrics includes debate-specific scalars.
+            Items have their data["rewards"] mutated with shaped values when a
+            non-identity strategy is configured.
         """
         items, upstream_metrics = self._upstream.get()
         self._get_count += 1
@@ -134,6 +163,7 @@ class _DebateMetricStreamerImpl:
                 init_debate_workspace()
             except Exception as e:
                 logger.warning(f"DebateMetricStreamer: workspace init failed: {e}")
+            self._update_wandb_config()
 
         # Apply rollout strategy BEFORE reward extraction (Phase 9)
         # Execution order: rollout selection -> reward extraction -> reward shaping -> metrics
@@ -162,9 +192,12 @@ class _DebateMetricStreamerImpl:
             )
 
         try:
-            # Extract rewards from items (possibly filtered by rollout strategy)
+            # STEP A: Extract rewards from items (possibly filtered by rollout strategy)
             # items[i].data is a dict with "rewards" key containing numpy scalar
             rewards = np.array([item.data["rewards"].item() for item in items])
+
+            # STEP B: Capture original dtype for write-back
+            original_dtype = items[0].data["rewards"].dtype
 
             # Extract role labels from item metadata
             # Metadata follows pattern: item.metadata["{env_name}/reward_metrics"] = dict with "role_label"
@@ -187,7 +220,8 @@ class _DebateMetricStreamerImpl:
                     # Default to "solver" if role_label not found
                     role_labels.append("solver")
 
-            # Compute debate metrics (unshaped, for backward compatibility)
+            # STEP C: Compute debate metrics (unshaped, for backward compatibility)
+            # These use the ORIGINAL raw rewards array. Do NOT move these after mutation.
             debate_metrics = {}
             debate_metrics.update(compute_per_role_rewards(rewards, role_labels))
 
@@ -199,17 +233,33 @@ class _DebateMetricStreamerImpl:
                 effective_n_rollouts = 1
             debate_metrics.update(compute_zero_advantage_metrics(rewards, effective_n_rollouts))
 
-            # Apply reward shaping and log shaped reward metrics (Phase 8)
+            # STEP D: Apply reward shaping, compute per-item shaped values, and log metrics
             try:
-                shaped_metrics = self._compute_shaped_reward_metrics(rewards, role_labels)
+                shaped_metrics, shaped_per_item = self._compute_and_apply_shaped_rewards(
+                    rewards, role_labels
+                )
                 debate_metrics.update(shaped_metrics)
+
+                # STEP E: Write shaped rewards back into items for learner consumption
+                # items from get() feed into FlinkRlooLearner -> GRPO loss reads
+                # item.data["rewards"] for advantage computation
+                for idx, item in enumerate(items):
+                    item.data["rewards"] = np.array(shaped_per_item[idx], dtype=original_dtype)
+
+                # One-time INFO log when reward mutation is active (non-identity strategy)
+                if not self._logged_mutation and self._reward_shaper.name != "identity":
+                    logger.info(
+                        f"DebateMetricStreamer: shaped rewards written to item.data['rewards'] "
+                        f"using strategy '{self._reward_shaper.name}'"
+                    )
+                    self._logged_mutation = True
             except Exception as e:
                 logger.warning(f"DebateMetricStreamer: reward shaping failed: {e}")
 
             # Merge: rollout strategy + debate + upstream (upstream takes precedence on conflict)
             all_metrics = {**rollout_strategy_metrics, **debate_metrics, **upstream_metrics}
 
-            # Log rollout table at configured intervals
+            # STEP F: Log rollout table at configured intervals (now sees shaped rewards)
             if self._get_count % self._config.log_rollout_table_every_n_gets == 0:
                 try:
                     from src.training.wandb_enrichment.rollout_integration import (
@@ -233,6 +283,7 @@ class _DebateMetricStreamerImpl:
                 except Exception as e:
                     logger.warning(f"DebateMetricStreamer: debug data writing failed: {e}")
 
+            # STEP G: Return (items, metrics) as before
             return items, all_metrics
 
         except Exception as e:
@@ -240,23 +291,26 @@ class _DebateMetricStreamerImpl:
             # Return upstream metrics unchanged on error
             return items, upstream_metrics
 
-    def _compute_shaped_reward_metrics(
+    def _compute_and_apply_shaped_rewards(
         self,
         rewards: np.ndarray,
         role_labels: list[str],
-    ) -> dict[str, float]:
-        """Compute shaped reward metrics using the configured strategy.
+    ) -> tuple[dict[str, float], np.ndarray]:
+        """Compute shaped reward metrics and per-item shaped values.
 
-        Applies the reward shaping strategy and logs per-role shaped rewards
-        as debate/shaped_reward/* metrics. For identity strategy, shaped rewards
-        equal original rewards.
+        Applies the reward shaping strategy, builds a per-item shaped reward
+        array for write-back into item.data["rewards"], and logs per-role
+        shaped rewards as debate/shaped_reward/* metrics. For identity strategy,
+        shaped rewards equal original rewards.
 
         Args:
             rewards: Shape (B,) raw rewards per rollout.
-            role_labels: Role label per rollout.
+            role_labels: Role label per rollout (length B).
 
         Returns:
-            Dict with shaped reward metrics using debate/shaped_reward/ prefix.
+            Tuple of (metrics_dict, shaped_per_item) where:
+            - metrics_dict: Dict with shaped reward metrics using debate/shaped_reward/ prefix.
+            - shaped_per_item: np.ndarray shape (B,) with shaped reward per item.
         """
         # Build role_masks from role_labels for strategies that need them
         batch_size = len(rewards)
@@ -269,32 +323,57 @@ class _DebateMetricStreamerImpl:
         # Apply reward shaping (trajectory_metadata not available in streamer context)
         shaped = self._reward_shaper.shape_rewards(rewards, role_masks, None)
 
-        # Convert shaped output to metrics dict
+        # Convert shaped output to metrics dict and build per-item shaped array
         metrics = {}
+
+        # Lookup dict for role -> metric constant
+        _ROLE_METRIC = {
+            "solver": METRIC_SHAPED_REWARD_SOLVER,
+            "verifier": METRIC_SHAPED_REWARD_VERIFIER,
+            "judge": METRIC_SHAPED_REWARD_JUDGE,
+        }
 
         if isinstance(shaped, dict):
             # Per-role shaped rewards (e.g., difference_rewards, reward_mixing, coma_advantage)
             for role, role_rewards in shaped.items():
                 if len(role_rewards) > 0:
-                    metrics[f"debate/shaped_reward/{role}"] = float(role_rewards.mean())
+                    metrics[_ROLE_METRIC.get(role, f"debate/shaped_reward/{role}")] = float(role_rewards.mean())
             # Also log overall mean shaped reward
             all_shaped = np.concatenate(list(shaped.values()))
             if len(all_shaped) > 0:
-                metrics["debate/shaped_reward/mean"] = float(all_shaped.mean())
+                metrics[METRIC_SHAPED_REWARD_MEAN] = float(all_shaped.mean())
+
+            # Build per-item shaped array from per-role dict
+            # Contract: all per-role strategies populate all B indices for every role key
+            # (verified in difference_rewards.py, coma_advantage.py, reward_mixing.py)
+            shaped_per_item = np.copy(rewards)  # start from raw as default fallback
+            for idx in range(batch_size):
+                role = role_labels[idx]
+                if role == "judge":
+                    shaped_per_item[idx] = 0.0
+                elif role in shaped:
+                    shaped_per_item[idx] = shaped[role][idx]
+                # else: keep rewards[idx] (raw fallback -- per locked decision)
         else:
             # Global shaped rewards (e.g., identity, potential_based)
-            metrics["debate/shaped_reward/mean"] = float(shaped.mean())
+            metrics[METRIC_SHAPED_REWARD_MEAN] = float(shaped.mean())
             # Break down by role
             for role in ("solver", "verifier", "judge"):
                 if role in role_masks:
                     role_shaped = shaped[role_masks[role]]
                     if len(role_shaped) > 0:
-                        metrics[f"debate/shaped_reward/{role}"] = float(role_shaped.mean())
+                        metrics[_ROLE_METRIC[role]] = float(role_shaped.mean())
+
+            # Build per-item shaped array from global ndarray
+            shaped_per_item = np.copy(shaped)
+            for idx in range(batch_size):
+                if role_labels[idx] == "judge":
+                    shaped_per_item[idx] = 0.0
 
         # Log which strategy is active
-        metrics["debate/shaped_reward/strategy_active"] = 1.0 if self._reward_shaper.name != "identity" else 0.0
+        metrics[METRIC_SHAPED_REWARD_STRATEGY_ACTIVE] = 1.0 if self._reward_shaper.name != "identity" else 0.0
 
-        return metrics
+        return metrics, shaped_per_item
 
     def flush_and_discard_ready_items(self):
         """Flush upstream streamer's ready items."""

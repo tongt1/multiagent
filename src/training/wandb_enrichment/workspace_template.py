@@ -39,6 +39,10 @@ from src.training.wandb_enrichment.metric_schema import (
     METRIC_REWARD_JUDGE,
     METRIC_REWARD_SOLVER,
     METRIC_REWARD_VERIFIER,
+    METRIC_SHAPED_REWARD_MEAN,
+    METRIC_SHAPED_REWARD_SOLVER,
+    METRIC_SHAPED_REWARD_VERIFIER,
+    METRIC_SHAPED_REWARD_JUDGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,11 +55,12 @@ def create_debate_workspace(
 ) -> None:
     """Create a W&B workspace template for debate training runs.
 
-    This function programmatically generates a W&B workspace with 4 sections:
+    This function programmatically generates a W&B workspace with 5 sections:
     1. Per-Role Rewards: Solver, Verifier, Judge reward curves
     2. Per-Role KL Divergence: KL from reference policy per role
     3. Training Health: Zero-advantage detection, gradient norms
-    4. Rollout Samples: (collapsed by default, for W&B Tables)
+    4. Reward Shaping: Shaped reward comparison across strategies
+    5. Rollout Samples: (collapsed by default, for W&B Tables)
 
     Args:
         entity: W&B team/user name
@@ -151,7 +156,36 @@ def create_debate_workspace(
         ]
 
         # =====================================================================
-        # Section 4: Rollout Samples
+        # Section 4: Reward Shaping Comparison
+        # =====================================================================
+        workspace.blocks = workspace.blocks + [
+            wr.H1(text="Reward Shaping"),
+            wr.LinePlot(
+                title="Mean Shaped Reward by Strategy",
+                x="Step",
+                y=[METRIC_SHAPED_REWARD_MEAN],
+                smoothing_factor=0.6,
+                range_x=None,
+                range_y=None,
+                legend_position="north",
+            ),
+            wr.LinePlot(
+                title="Per-Role Shaped Rewards",
+                x="Step",
+                y=[
+                    METRIC_SHAPED_REWARD_SOLVER,
+                    METRIC_SHAPED_REWARD_VERIFIER,
+                    METRIC_SHAPED_REWARD_JUDGE,
+                ],
+                smoothing_factor=0.6,
+                range_x=None,
+                range_y=None,
+                legend_position="north",
+            ),
+        ]
+
+        # =====================================================================
+        # Section 5: Rollout Samples
         # =====================================================================
         workspace.blocks = workspace.blocks + [
             wr.H1(text="Rollout Samples"),
