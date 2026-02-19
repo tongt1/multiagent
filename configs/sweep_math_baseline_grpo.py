@@ -81,7 +81,7 @@ class MathBaselineGRPO(sweep_base.Sweep):
         queue=sweep.Queue.post_training_cohere_labs_queue,
         jobs_max_fanout=1,
         wandb_project="multiagent-debate-rl",
-        priority_class="dev-high",
+        priority_class="dev-low",
         run_config="${HOME}/repos/post_training/post_training/experimental/comb_flink/configs/rloo_7B_math.run",
         k8s_env_secrets_toml=K8S_SECRETS_PATH,  # Contains CO_API_KEY_STAGING (unlimited key)
         ckpt_path=CKPT_PATH,
@@ -210,14 +210,14 @@ class MathBaselineGRPO(sweep_base.Sweep):
             ),
             finetuning=dict(
                 lora=dict(
-                    enabled=True,
+                    enabled=False,  # LoRA + quantize causes ptxas shared memory overflow on 7B
                     rank=8,
                     alpha=8.0,
                 ),
             ),
             model_export=dict(enabled=False),
-            profile_every_steps=5,
-            first_step_to_profile=1,
+            profile_every_steps=-1,  # Disable profiling (breaks preemption)
+            first_step_to_profile=1000000,
             read_extra_state=False,
         ),
         retries=0,

@@ -2,38 +2,36 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-14)
+See: .planning/PROJECT.md (updated 2026-02-13)
 
-**Core value:** All 5 reward strategies must be fully wired end-to-end so shaped rewards affect gradient updates and produce meaningful WandB comparison curves.
-**Current focus:** Phase 3 - Observability and Comparison
+**Core value:** Accurately measure and visualize all 10 CooperBench failure modes from multi-agent transcripts
+**Current focus:** Phase 1 - Failure Mode Evaluation Pipeline
 
 ## Current Position
 
-Phase: 3 of 3 (Observability and Comparison) -- Plan 02 Task 1 complete, checkpoint pending
-Plan: 2 of 2 in current phase
-Status: Plan 03-02 Task 1 complete, Task 2 awaiting human verification (checkpoint:human-verify)
-Last activity: 2026-02-14 -- Completed 03-02 Task 1 (batch submission script + WANDB_PROJECT tests)
+Phase: 1 of 1 (Failure Mode Evaluation Pipeline)
+Plan: 2 of TBD in current phase
+Status: Executing
+Last activity: 2026-02-13 -- Plan 02 completed (metrics computation + visualization)
 
-Progress: [#############░] 90%
+Progress: [####░░░░░░] ~40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (03-02 Task 1 done, checkpoint pending)
-- Average duration: 4.4min
-- Total execution time: 0.37 hours
+- Total plans completed: 2
+- Average duration: 55s
+- Total execution time: ~2 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-end-to-end-reward-integration | 2 | 11min | 5.5min |
-| 02-experiment-configuration | 1 | 6min | 6min |
-| 03-observability-and-comparison | 1+1T1 | 5min | 2.5min |
+| 01 | 2 | 110s | 55s |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 6min, 6min, 3min, 2min
-- Trend: Accelerating, 2min for Plan 03-02 Task 1
+- Last 5 plans: 01-01 (57s), 01-02 (53s)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -44,41 +42,24 @@ Progress: [#############░] 90%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- SmolLM-135M chosen for fast iteration (minutes not hours)
-- All 5 strategies in single comparison with same hyperparams
-- Default strategy hyperparams (no per-strategy tuning in v1)
-- Refactored _compute_shaped_reward_metrics to _compute_and_apply_shaped_rewards returning (metrics, shaped_per_item) tuple
-- Judge items always receive 0.0 reward regardless of strategy type
-- Missing role in per-role dict falls back to raw reward
-- Original dtype preserved via np.array(value, dtype=original_dtype)
-- Used torch.backward() for gradient-norm comparison per locked decisions R12/R13
-- atol=1e-6, rtol=1e-5 tolerances for identity regression per user decision
-- Invalid strategy name errors at __init__() time (fail fast), not at runtime
-- AST/text-based test validation for SWEEP configs (sweep module unavailable locally)
-- Shared _base.py module guarantees ECFG-06 (identical hyperparams except reward shaping)
-- Used sys.modules mock pattern for wandb tests since wandb is not installed locally
-- Placed _update_wandb_config() call after workspace init in first get() to ensure wandb.run exists
-- Used mutually exclusive argparse group for --dry-run/--submit/--validate to prevent ambiguous invocations
-- Deferred wandb import to validate_runs() since wandb not installed locally
+- Single-phase delivery: all 13 requirements tightly coupled, no natural split
+- Jaccard token overlap for repetition similarity (simple, no external deps)
+- Regex-based extraction for file paths and function names in overlap detection
+- Technology conflict pairs as explicit set pairs for divergent architecture detection
+- Matplotlib Agg backend for headless environments
+- Blue gradient color palette for bar chart visualization
+- 300 DPI output for publication-quality figures
 
 ### Pending Todos
 
-None.
+None yet.
 
 ### Blockers/Concerns
 
-- RESOLVED: Reward shaping strategies now wired into DebateMetricStreamer with write-back to item.data["rewards"]
-- RESOLVED: Identity regression and gradient-path liveness verified via 13 integration tests
-- RESOLVED: DebateMetricStreamerConfig reward_shaping_strategy/params fields now uncommented in 5 strategy-specific SWEEP configs
-- RESOLVED: All 5 configs verified identical except for reward shaping fields (85 tests, ECFG-01 through ECFG-08)
-- RESOLVED: Shaped reward metrics centralized as METRIC_SHAPED_REWARD_* constants, hardcoded strings replaced
-- RESOLVED: wandb.config.update() surfaces reward_shaping_strategy for WandB run filtering
-- RESOLVED: Batch submission script created with --dry-run, --submit, --validate modes
-- RESOLVED: All 5 configs share WANDB_PROJECT constant (12 additional tests, 102 total)
-- CHECKPOINT: Plan 03-02 Task 2 -- user must submit all 5 runs and verify WandB dashboard
+None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-14
-Stopped at: Completed 03-02-PLAN.md Task 1 (batch submission script + WANDB_PROJECT tests). Checkpoint pending for Task 2 (human-verify).
-Resume file: .planning/phases/03-observability-and-comparison/03-02-SUMMARY.md
+Last session: 2026-02-13
+Stopped at: Completed 01-02-PLAN.md (metrics computation + visualization)
+Resume file: None

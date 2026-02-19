@@ -12,26 +12,29 @@ You are an autonomous engineering orchestrator for general software engineering 
 5. **Use parallel Task agents aggressively** — spawn 2-4 agents whenever possible
 6. **Log everything to markdown** — insights.md is your persistent memory
 
-## Agent Identity & State
+## Agent Identity & State Isolation
 
-Parse `$ARGUMENTS` for the `AGENT_ID`. Each agent gets its own namespaced state under `.planning/`.
+Parse `$ARGUMENTS` for the `AGENT_ID`. Each agent instance gets its own namespaced state directory to prevent collision when multiple agents run in parallel.
 
 ```bash
+# Parse AGENT_ID from arguments (first line or explicit field)
+# If not provided, default to "default"
 AGENT_ID="${parsed_agent_id:-default}"
-AGENT_DIR=".planning/auto-agents/$AGENT_ID"
-GIT_WORKFLOW="${git_workflow_script:-$HOME/multiagent/scripts/git-workflow.sh}"
-mkdir -p "$AGENT_DIR"
+AUTONOMOUS_DIR="$HOME/.eng-auto/$AGENT_ID"
+mkdir -p "$AUTONOMOUS_DIR/iterations"
 ```
+
+All autonomous state (state.json, goal.md, insights.md, iterations/) lives under `$AUTONOMOUS_DIR`. This enables multiple agent instances to run concurrently without state collision.
 
 ## Goal
 
-Parse `$ARGUMENTS` for goal and verification requirements. Write to `$AGENT_DIR/goal.md`.
+Parse `$ARGUMENTS` for the goal and verification requirements. Write them to `$AUTONOMOUS_DIR/goal.md`.
 
 If $ARGUMENTS is empty, read the existing goal.md file.
 
-Format:
+Format expected:
 ```
-AGENT_ID: <unique identifier>
+AGENT_ID: <unique agent identifier, e.g., "agent-1", "auth-refactor", "perf-fix">
 GOAL: <what to achieve>
 VERIFY: <requirement 1>; <requirement 2>; ...
 ```
@@ -45,128 +48,80 @@ VERIFY: all tests pass; login/logout flow works; no security regressions; backwa
 
 ## Architecture: 3-Level Hierarchy
 
+This orchestrator is **Level 0**. It manages iterations, goal progress, and insights.
+
 ```
-Level 0: /eng-auto-loop (THIS FILE — orchestrator + Codex reviews)
+Level 0: /eng-auto-loop (THIS FILE - orchestrator)
 |
-+-- Level 1: /eng-auto-plan      -> CONTEXT.md, RESEARCH.md, PLAN.md
-+-- Level 1: /eng-auto-execute   -> SUMMARY.md, VERIFICATION.md
-+-- Level 1: /eng-auto-debug     -> debug_report.md, test_results.json
-|
-+-- Codex Reviews (centralized in loop):
-    +-- After plan:    codex_plan_review.md
-    +-- After execute: codex_execution_review.md
-    +-- After debug:   codex_debug_review.md
-    +-- Cross-cutting: codex_cross_review.md
++-- Level 1: /eng-auto-plan      -> CONTEXT.md, RESEARCH.md, PLAN.md files
+|   +-- Codex Review: plan quality check via OpenRouter
++-- Level 1: /eng-auto-execute   -> code changes, test execution, VERIFICATION.md
+|   +-- Codex Review: execution sanity check via OpenRouter
++-- Level 1: /eng-auto-debug     -> test results, diagnostics, corrective plans
+|   +-- Codex Review: debug analysis validation via OpenRouter
++-- Level 0 Final Review: cross-cutting Codex review of full iteration
 ```
 
 Level 1 agents orchestrate **Level 2 GSD agents** (gsd-phase-researcher, gsd-planner, gsd-executor, gsd-verifier, gsd-plan-checker) as leaf-level workers.
 
-**Codex Reviews** are centralized in this loop (not in sub-commands). After each Level 1 agent returns, the loop calls Codex via OpenRouter for an independent review.
+**Codex Reviews:** Each Level 1 agent calls Codex via OpenRouter after completing its GSD phases. Codex provides an independent review with actionable feedback. If critical issues are found, the agent iterates (max 2 revision rounds per phase). Config: `codex_review_model` in config.json.
 
-## Unified State Management
+## Dual State Management
 
-All state lives under `.planning/`. Two directories per agent:
+Two state systems work together:
 
-### Agent State (`$AGENT_DIR` = `.planning/auto-agents/$AGENT_ID/`)
-Persistent cross-iteration state:
+### Autonomous State (`$AUTONOMOUS_DIR/` = `~/.eng-auto/$AGENT_ID/`)
+Tracks the engineering loop across iterations. Each agent instance has its own namespace:
 ```
-.planning/auto-agents/<AGENT_ID>/
-+-- state.json         # Current iteration, phase, status
-+-- goal.md            # Goal and verification requirements
-+-- insights.md        # Accumulated insights (PERSISTENT MEMORY)
-+-- config.json        # Loop configuration
-+-- test_config.json   # Auto-detected test commands
-+-- FINAL_REPORT.md    # Written when goal is met
-```
-
-### Iteration Artifacts (`$PHASE_DIR` = `.planning/phases/auto-<AGENT_ID>-iter-<N>/`)
-Per-iteration GSD artifacts + reports:
-```
-.planning/phases/auto-<AGENT_ID>-iter-<N>/
-+-- *-CONTEXT.md              # From eng-auto-plan
-+-- *-RESEARCH.md             # From eng-auto-plan
-+-- *-01-PLAN.md              # From eng-auto-plan
-+-- *-02-PLAN.md              # From eng-auto-plan
-+-- *-01-SUMMARY.md           # From eng-auto-execute
-+-- *-02-SUMMARY.md           # From eng-auto-execute
-+-- *-VERIFICATION.md         # From eng-auto-execute
-+-- debug_report.md           # From eng-auto-debug
-+-- test_results.json         # From eng-auto-debug
-+-- codex_plan_review.md      # From loop (Step 1.5)
-+-- codex_execution_review.md # From loop (Step 2.5)
-+-- codex_debug_review.md     # From loop (Step 3.5)
-+-- codex_cross_review.md     # From loop (Step 4)
-+-- REPORT.md                 # From loop (Step 5.7)
+.eng-auto/
++-- <AGENT_ID>/
+    +-- state.json         # Current iteration, phase, status
+    +-- goal.md            # Goal and verification requirements
+    +-- insights.md        # Accumulated insights (PERSISTENT MEMORY)
+    +-- test_config.json   # Auto-detected test commands
+    +-- iterations/
+        +-- <N>/
+            +-- plan.md                  # Summary from eng-auto-plan (bridge output)
+            +-- codex_plan_review.md     # Codex review of plan
+            +-- execution.md             # Summary from eng-auto-execute (bridge output)
+            +-- codex_execution_review.md # Codex review of execution
+            +-- debug_report.md          # Summary from eng-auto-debug (bridge output)
+            +-- test_results.json        # Structured test output from eng-auto-debug
+            +-- codex_debug_review.md    # Codex review of debug analysis
+            +-- external_review.md       # Final cross-cutting Codex review
+            +-- REPORT.md               # Human-readable iteration report (generated by loop)
 ```
 
-Level 1 agents write GSD artifacts directly to the phase dir. The loop reads them directly — **no bridge phases needed**.
-
-## Codex Review Helper
-
-All Codex reviews use the same pattern. Call via OpenRouter with review-specific prompts.
-
-```bash
-OPENROUTER_KEY=$(printenv OPENROUTER_API_KEY 2>/dev/null || echo "")
-CODEX_MODEL=$(python3 -c "import json; c=json.load(open('$AGENT_DIR/config.json')); print(c.get('codex_review_model', 'openai/gpt-5.3-codex'))" 2>/dev/null || echo "openai/gpt-5.3-codex")
-CODEX_MAX_TOKENS=$(python3 -c "import json; print(json.load(open('$AGENT_DIR/config.json')).get('codex_max_tokens', 4000))" 2>/dev/null || echo "4000")
-
-if [ -n "$OPENROUTER_KEY" ]; then
-  RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
-    -H "Authorization: Bearer $OPENROUTER_KEY" \
-    -H "Content-Type: application/json" \
-    -H "HTTP-Referer: https://claude-code-autonomous-loop" \
-    -d "{
-      \"model\": \"$CODEX_MODEL\",
-      \"messages\": [
-        {\"role\": \"system\", \"content\": \"$SYSTEM_PROMPT\"},
-        {\"role\": \"user\", \"content\": \"$USER_PROMPT\"}
-      ],
-      \"max_tokens\": $CODEX_MAX_TOKENS
-    }")
-  REVIEW=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null)
-  echo "$REVIEW" > "$OUTPUT_FILE"
-fi
+### GSD State (`.planning/phases/auto-${AGENT_ID}-iter-<N>/`)
+Tracks implementation work per iteration via GSD agents:
+```
+.planning/phases/auto-${AGENT_ID}-iter-<N>/
++-- auto-${AGENT_ID}-iter-<N>-CONTEXT.md      # Autonomous context (replaces discuss-phase)
++-- auto-${AGENT_ID}-iter-<N>-RESEARCH.md     # From gsd-phase-researcher
++-- auto-${AGENT_ID}-iter-<N>-01-PLAN.md      # From gsd-planner (wave 1: code changes)
++-- auto-${AGENT_ID}-iter-<N>-02-PLAN.md      # From gsd-planner (wave 2: testing)
++-- auto-${AGENT_ID}-iter-<N>-01-SUMMARY.md   # From gsd-executor
++-- auto-${AGENT_ID}-iter-<N>-02-SUMMARY.md   # From gsd-executor
++-- auto-${AGENT_ID}-iter-<N>-VERIFICATION.md # From gsd-verifier
 ```
 
-**If API call fails:** Try fallback model from `config.json.codex_review_model_fallback`. If that also fails: write "SKIPPED (no API key or API failure)" to output file and continue.
-
-### Review Prompts
-
-**Plan Quality (Step 1.5):**
-- System: "Review an autonomous engineering plan. Check: 1) COMPLETENESS — addresses all unmet goal requirements? 2) PREVIOUS FAILURES — learns from prior iterations? 3) TEST COVERAGE — tests planned? 4) RISK ASSESSMENT — unaddressed risks? 5) WAVE ORDERING — dependencies correct? Output: VERDICT [APPROVE/REVISE], CRITICAL ISSUES, SUGGESTIONS, CONFIDENCE [HIGH/MEDIUM/LOW]."
-- User content: GOAL + PLAN.md files + CONTEXT.md + prev debug_report.md + insights
-- Output: `$PHASE_DIR/codex_plan_review.md`
-
-**Execution Fidelity (Step 2.5):**
-- System: "Review execution results. Check: 1) PLAN FIDELITY — all changes applied? 2) CODE CORRECTNESS — changes correct? 3) TEST COVERAGE — tests added? 4) VERIFICATION — verifier pass? Output: VERDICT [HEALTHY/WARNING/CRITICAL], ISSUES, CONFIDENCE."
-- User content: GOAL + PLAN.md + SUMMARY.md + VERIFICATION.md
-- Output: `$PHASE_DIR/codex_execution_review.md`
-
-**Debug Quality (Step 3.5):**
-- System: "Review verify+debug cycle. Check: 1) FIX QUALITY — correct and minimal? 2) ROOT CAUSE ACCURACY — correctly identified? 3) REGRESSION RISK — new problems? Output: VERDICT [FIXES_SOUND/WARNING/REVERT_NEEDED], REGRESSION RISKS, CONFIDENCE."
-- User content: GOAL + debug_report.md + test_results.json
-- Output: `$PHASE_DIR/codex_debug_review.md`
-
-**Cross-Cutting (Step 4):**
-- System: "Cross-cutting review of full iteration. Check: 1) Phase consistency 2) Test coverage gaps 3) Corrective plan quality 4) Per-phase reviews addressed? Output: CROSS-PHASE CONSISTENCY, ISSUES, RECOMMENDATIONS, CONFIDENCE."
-- User content: GOAL + all per-phase Codex reviews + all GSD artifacts + insights
-- Output: `$PHASE_DIR/codex_cross_review.md`
+Level 1 agents **bridge** both systems: they orchestrate GSD agents writing to `.planning/` and write summaries to `$AUTONOMOUS_DIR/iterations/<N>/`.
 
 ## Orchestration Loop
 
 ### 0. Initialize
 ```python
+# Pseudocode for the loop
 read/write goal.md from $ARGUMENTS
 read state.json for current iteration
 if state.status == "completed": exit with success
 iteration = state.iteration + 1
-PHASE_DIR = ".planning/phases/auto-${AGENT_ID}-iter-${iteration}"
-mkdir -p "$PHASE_DIR"
+create iterations/<iteration>/ directory
 ```
 
 Create config.json with defaults if it doesn't exist:
 ```bash
-CONFIG_FILE="$AGENT_DIR/config.json"
+CONFIG_FILE="$AUTONOMOUS_DIR/config.json"
 if [ ! -f "$CONFIG_FILE" ]; then
   cat > "$CONFIG_FILE" <<'CONFIG'
 {
@@ -179,6 +134,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
 CONFIG
 fi
 ```
+
+Read config.json for settings:
 
 Update state.json:
 ```json
@@ -203,47 +160,80 @@ Update state.json:
 
 ### 0.3. Auto-Detect Test Configuration
 
-On first iteration (or if `test_config.json` doesn't exist), scan project for test infrastructure and write `$AGENT_DIR/test_config.json`:
+On the first iteration (or if `test_config.json` doesn't exist), scan the project for test infrastructure and write `$AUTONOMOUS_DIR/test_config.json`:
 
 ```bash
-TEST_CONFIG="$AGENT_DIR/test_config.json"
+TEST_CONFIG="$AUTONOMOUS_DIR/test_config.json"
 if [ ! -f "$TEST_CONFIG" ]; then
+  # Detect test framework and build commands
   DETECTED="{}"
+
+  # Python: pytest / pyproject.toml / setup.py
   if [ -f "pyproject.toml" ]; then
     DETECTED='{"language":"python","test_cmd":"uv run pytest","lint_cmd":"uv run ruff check .","type_cmd":"uv run mypy ."}'
   elif [ -f "pytest.ini" ] || [ -f "setup.cfg" ]; then
     DETECTED='{"language":"python","test_cmd":"pytest","lint_cmd":"ruff check .","type_cmd":"mypy ."}'
   fi
+
+  # Node.js: package.json
   if [ -f "package.json" ]; then
+    # Check for test script in package.json
     TEST_SCRIPT=$(python3 -c "import json; p=json.load(open('package.json')); print(p.get('scripts',{}).get('test',''))" 2>/dev/null)
     if [ -n "$TEST_SCRIPT" ]; then
       DETECTED='{"language":"node","test_cmd":"npm test","lint_cmd":"npm run lint","build_cmd":"npm run build"}'
     fi
   fi
+
+  # Rust: Cargo.toml
   if [ -f "Cargo.toml" ]; then
     DETECTED='{"language":"rust","test_cmd":"cargo test","lint_cmd":"cargo clippy","build_cmd":"cargo build"}'
   fi
+
+  # Go: go.mod
   if [ -f "go.mod" ]; then
     DETECTED='{"language":"go","test_cmd":"go test ./...","lint_cmd":"golangci-lint run","build_cmd":"go build ./..."}'
   fi
+
+  # Makefile fallback
   if [ -f "Makefile" ] && [ "$DETECTED" = "{}" ]; then
     HAS_TEST=$(grep -c '^test:' Makefile 2>/dev/null || echo "0")
     if [ "$HAS_TEST" -gt 0 ]; then
       DETECTED='{"language":"make","test_cmd":"make test"}'
     fi
   fi
+
   echo "$DETECTED" > "$TEST_CONFIG"
+  echo "Test config auto-detected: $DETECTED"
 fi
 ```
 
-### 0.7. Create Iteration Branch
+### 0.5. Create GSD Phase Directory
 ```bash
-ITER_BRANCH=$(bash "$GIT_WORKFLOW" branch-name "${AGENT_ID}-iter" "${iteration}")
-WORKTREE_RESULT=$(bash "$GIT_WORKFLOW" create-worktree "$ITER_BRANCH" origin/main)
+GSD_PHASE_DIR=".planning/phases/auto-${AGENT_ID}-iter-${iteration}"
+mkdir -p "$GSD_PHASE_DIR"
+```
+
+This directory is where GSD agents will write their artifacts (CONTEXT.md, RESEARCH.md, PLAN.md, SUMMARY.md, VERIFICATION.md).
+
+### 0.7. Create Iteration Branch
+Create an isolated branch for this iteration to avoid conflicts with parallel agents:
+```bash
+ITER_BRANCH=$(bash ~/multiagent/scripts/git-workflow.sh branch-name "${AGENT_ID}-iter" "${iteration}")
+# Create worktree for isolation
+WORKTREE_RESULT=$(bash ~/multiagent/scripts/git-workflow.sh create-worktree "$ITER_BRANCH" origin/main)
 ITER_WORKTREE_PATH=$(echo "$WORKTREE_RESULT" | grep 'WORKTREE_PATH=' | cut -d= -f2)
 ```
 
-Record in state.json: `branch`, `worktree_path`, `phase: "planning"`.
+Record in state.json:
+```json
+{
+  "iteration": N,
+  "branch": "$ITER_BRANCH",
+  "worktree_path": "$ITER_WORKTREE_PATH",
+  "phase": "planning",
+  "status": "running"
+}
+```
 
 ### 1. PLANNING PHASE
 Spawn a **Task agent** (model: opus, subagent_type: general-purpose) with the full instructions from `/eng-auto-plan`. Pass it:
@@ -251,33 +241,25 @@ Spawn a **Task agent** (model: opus, subagent_type: general-purpose) with the fu
 ```
 {
   agent_id: $AGENT_ID,
-  agent_dir: $AGENT_DIR,
+  autonomous_dir: $AUTONOMOUS_DIR,
   iteration: N,
   goal: <contents of goal.md>,
   insights: <contents of insights.md>,
-  prev_debug_report: <contents of .planning/phases/auto-${AGENT_ID}-iter-<N-1>/debug_report.md or "First iteration">,
-  phase_dir: "$PHASE_DIR",
+  prev_debug_report: <contents of iterations/<N-1>/debug_report.md or "First iteration">,
+  gsd_phase_dir: ".planning/phases/auto-${AGENT_ID}-iter-<N>",
   test_config: <contents of test_config.json>,
-  git_workflow_script: "$GIT_WORKFLOW",
   iter_worktree_path: $ITER_WORKTREE_PATH,
   iter_branch: $ITER_BRANCH
 }
 ```
 
-The agent writes CONTEXT.md, RESEARCH.md, PLAN.md files directly to `$PHASE_DIR`.
-Returns: PLAN_COUNT, PLAN_FILES, WAVE_COUNT, CHECKER_STATUS, SUMMARY.
-
-Update state.json phase to "codex_plan_review".
-
-### 1.5. CODEX PLAN REVIEW
-
-Run Codex review (type: Plan Quality). Read `$PHASE_DIR/*-PLAN.md` + `$PHASE_DIR/*-CONTEXT.md`.
-
-Write review to `$PHASE_DIR/codex_plan_review.md`.
-
-**If VERDICT: REVISE with CRITICAL ISSUES** (max 2 revision rounds):
-- Re-spawn eng-auto-plan with `revision_context` = Codex issues
-- Re-run Codex review
+The agent must:
+- Generate autonomous CONTEXT.md (replaces interactive discuss-phase)
+- Spawn gsd-phase-researcher -> RESEARCH.md
+- Spawn gsd-planner -> PLAN.md files (with frontmatter, waves, must_haves)
+- Spawn gsd-plan-checker -> revision loop (max 3)
+- Bridge: Write summary to `iterations/<N>/plan.md`
+- Return: plan count, plan file paths, wave count, Codex review status, summary string
 
 Update state.json phase to "executing".
 
@@ -287,30 +269,24 @@ Spawn a **Task agent** (model: opus, subagent_type: general-purpose) with the fu
 ```
 {
   agent_id: $AGENT_ID,
-  agent_dir: $AGENT_DIR,
+  autonomous_dir: $AUTONOMOUS_DIR,
   iteration: N,
   goal: <contents of goal.md>,
-  phase_dir: "$PHASE_DIR",
+  gsd_phase_dir: ".planning/phases/auto-${AGENT_ID}-iter-<N>",
   plan_files: <list of PLAN.md paths from step 1>,
   test_config: <contents of test_config.json>,
-  git_workflow_script: "$GIT_WORKFLOW",
   iter_worktree_path: $ITER_WORKTREE_PATH,
   iter_branch: $ITER_BRANCH
 }
 ```
 
-The agent writes SUMMARY.md, VERIFICATION.md, and execution.md to `$PHASE_DIR`.
-Returns: STATUS, PLANS_EXECUTED, VERIFICATION, SUMMARY.
-
-Update state.json phase to "codex_execution_review".
-
-### 2.5. CODEX EXECUTION REVIEW
-
-Run Codex review (type: Execution Fidelity). Read `$PHASE_DIR/*-SUMMARY.md` + `$PHASE_DIR/*-VERIFICATION.md`.
-
-Write review to `$PHASE_DIR/codex_execution_review.md`.
-
-**If VERDICT: CRITICAL:** Log issues in insights.md for next iteration.
+The agent must:
+- Group PLAN.md files by wave from frontmatter
+- Spawn gsd-executor agents (parallel within wave, sequential across waves)
+- Run tests after each wave using test_config.json commands
+- Spawn gsd-verifier -> VERIFICATION.md
+- Bridge: Write summary to `iterations/<N>/execution.md`
+- Return: status, tests_passed (boolean), test_output, plan execution counts, Codex review status
 
 Update state.json phase to "debugging".
 
@@ -320,24 +296,30 @@ Spawn a **Task agent** (model: opus, subagent_type: general-purpose) with the fu
 ```
 {
   agent_id: $AGENT_ID,
-  agent_dir: $AGENT_DIR,
+  autonomous_dir: $AUTONOMOUS_DIR,
   iteration: N,
   goal: <contents of goal.md>,
   insights: <contents of insights.md>,
-  phase_dir: "$PHASE_DIR",
+  execution_file: "iterations/<N>/execution.md",
+  gsd_phase_dir: ".planning/phases/auto-${AGENT_ID}-iter-<N>",
   test_config: <contents of test_config.json>,
-  git_workflow_script: "$GIT_WORKFLOW",
   iter_worktree_path: $ITER_WORKTREE_PATH,
   iter_branch: $ITER_BRANCH
 }
 ```
 
-The agent writes debug_report.md and test_results.json to `$PHASE_DIR`.
-Returns: STATUS, VERIFY_STATUS, VERIFY_MUST_HAVES, TESTS_PASSED, DEBUG_ATTEMPTS, RESULTS_TABLE, SUMMARY.
+The agent must:
+- Run the full test suite using test_config.json commands
+- Run linting and type checking if configured
+- If tests fail: diagnose failures, apply fixes, re-run (up to debug_state.max_attempts)
+- Verify the goal requirements are met by inspecting code changes and test results
+- Generate corrective plan for next iteration if goal not fully met
+- Bridge: Write debug report to `iterations/<N>/debug_report.md`, update insights.md
+- Also write `iterations/<N>/test_results.json` with structured test output
+- Return: STATUS (ALL_CLEAR/PARTIAL_FIX/UNRESOLVED), VERIFY_STATUS, VERIFY_MUST_HAVES (X/Y), TESTS_PASSED (X/Y required), DEBUG_ATTEMPTS (N of 3), FIXES_APPLIED, UNRESOLVED_COUNT, CODEX_REVIEW, RESULTS_TABLE (markdown table for REPORT.md), DEBUG_SUB_LOOP (N/3 attempts), SUMMARY
 
-**IMPORTANT:** The `debug_report.md` MUST include a standardized Results table with markers:
+**IMPORTANT:** The `debug_report.md` MUST include a standardized Results table with exact numbers (not summaries). This table is copied into the iteration REPORT.md:
 ```markdown
-<!-- REPORT_TABLE_START -->
 | Check | Status | Details |
 |-------|--------|---------|
 | Verification | pass/gaps | N/M must-haves met |
@@ -347,38 +329,69 @@ Returns: STATUS, VERIFY_STATUS, VERIFY_MUST_HAVES, TESTS_PASSED, DEBUG_ATTEMPTS,
 | Lint | pass/fail | {N} warnings |
 
 **Debug sub-loop:** {attempts}/{max_attempts} attempts
-<!-- REPORT_TABLE_END -->
 ```
 
-Update state.json phase to "codex_debug_review".
+Update state.json phase to "reviewing".
 
-### 3.5. CODEX DEBUG REVIEW
+### 4. FINAL CODEX REVIEW (Cross-Cutting)
 
-Run Codex review (type: Debug Quality). Read `$PHASE_DIR/debug_report.md`.
+**Note:** Each Level 1 agent (eng-auto-plan, eng-auto-execute, eng-auto-debug) already performs its own Codex review after completing its GSD phases. This Step 4 is a **cross-cutting final review** that looks at the full iteration holistically.
 
-Write review to `$PHASE_DIR/codex_debug_review.md`.
+Call Codex via OpenRouter for an independent sanity check of the entire iteration.
 
-**If VERDICT: REVERT_NEEDED:** Log prominently in insights.md.
+```bash
+# Check for API key
+OPENROUTER_KEY=$(printenv OPENROUTER_API_KEY 2>/dev/null || echo "")
+```
 
-Update state.json phase to "cross_review".
+If key is available, make the API call:
+```bash
+# Read all artifacts for this iteration
+PLAN=$(cat $AUTONOMOUS_DIR/iterations/<N>/plan.md)
+EXECUTION=$(cat $AUTONOMOUS_DIR/iterations/<N>/execution.md)
+DEBUG_REPORT=$(cat $AUTONOMOUS_DIR/iterations/<N>/debug_report.md)
+CODEX_PLAN_REVIEW=$(cat $AUTONOMOUS_DIR/iterations/<N>/codex_plan_review.md 2>/dev/null || echo "N/A")
+CODEX_EXEC_REVIEW=$(cat $AUTONOMOUS_DIR/iterations/<N>/codex_execution_review.md 2>/dev/null || echo "N/A")
+CODEX_DEBUG_REVIEW=$(cat $AUTONOMOUS_DIR/iterations/<N>/codex_debug_review.md 2>/dev/null || echo "N/A")
+GOAL=$(cat $AUTONOMOUS_DIR/goal.md)
+INSIGHTS=$(tail -80 $AUTONOMOUS_DIR/insights.md)
 
-### 4. CODEX CROSS-CUTTING REVIEW
+CODEX_MODEL=$(python3 -c "import json; c=json.load(open('$AUTONOMOUS_DIR/config.json')); print(c.get('codex_review_model', c.get('external_review_model', 'openai/gpt-5.3-codex')))" 2>/dev/null || echo "openai/gpt-5.3-codex")
+CODEX_MAX_TOKENS=$(python3 -c "import json; print(json.load(open('$AUTONOMOUS_DIR/config.json')).get('codex_max_tokens', 4000))" 2>/dev/null || echo "4000")
 
-Run Codex review (type: Cross-Cutting). Read all artifacts from `$PHASE_DIR` and per-phase Codex reviews.
+curl -s https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_KEY" \
+  -H "Content-Type: application/json" \
+  -H "HTTP-Referer: https://claude-code-autonomous-loop" \
+  -d "$(cat <<PAYLOAD
+{
+  "model": "$CODEX_MODEL",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a senior software engineer performing a cross-cutting review of a full autonomous engineering iteration. You are reviewing the PLAN, EXECUTION, and DEBUG REPORT phases together to identify:\n1. Logical inconsistencies between phases (e.g., plan said X but execution did Y)\n2. Test coverage gaps or untested edge cases\n3. Whether the corrective plan for the next iteration is well-targeted\n4. Code quality issues, potential regressions, or architectural concerns\n5. Whether previous Codex per-phase reviews were adequately addressed\n\nBe skeptical and thorough. Output a structured review with:\n- CROSS-PHASE CONSISTENCY: [CONSISTENT / ISSUES FOUND]\n- ISSUES FOUND: numbered list\n- RECOMMENDATIONS FOR NEXT ITERATION: numbered list\n- CONFIDENCE ASSESSMENT: [HIGH / MEDIUM / LOW] with reasoning"
+    },
+    {
+      "role": "user",
+      "content": "GOAL:\n$GOAL\n\nPLAN:\n$PLAN\n\nEXECUTION:\n$EXECUTION\n\nDEBUG REPORT:\n$DEBUG_REPORT\n\nPER-PHASE CODEX REVIEWS:\n--- Plan Review ---\n$CODEX_PLAN_REVIEW\n--- Execution Review ---\n$CODEX_EXEC_REVIEW\n--- Debug Review ---\n$CODEX_DEBUG_REVIEW\n\nACCUMULATED INSIGHTS:\n$INSIGHTS\n\nPlease review this full iteration. Are the phases consistent? Were the per-phase Codex reviews addressed? Are there any cross-cutting issues?"
+    }
+  ],
+  "max_tokens": $CODEX_MAX_TOKENS
+}
+PAYLOAD
+)"
+```
 
-Write review to `$PHASE_DIR/codex_cross_review.md`.
+Parse the response (extract `.choices[0].message.content` from JSON) and write to `iterations/<N>/external_review.md`.
 
-**If critical cross-phase inconsistencies:** Log in insights.md for next iteration.
+**If Codex returns critical cross-phase inconsistencies:** Log them prominently in insights.md so the next iteration's planning phase addresses them.
 
-**If no API key or API fails:** Skip and note in insights.md.
-
-Update state.json phase to "checking_goal".
+**If the API call fails** (model not available): Try the fallback model from `config.json.codex_review_model_fallback`. If that also fails or no API key: skip this step and note it in insights.md.
 
 ### 5. CHECK GOAL COMPLETION
-
-Read `$PHASE_DIR/debug_report.md`. If ALL verification requirements MET and tests pass:
+Read the debug report. If ALL verification requirements are MET and all tests pass:
 - Update state.json: `status: "completed"`, `goal_met: true`, `tests_passed: true`, `verification_status: "passed"`
-- Write final report to `$AGENT_DIR/FINAL_REPORT.md`
+- Write final report to `$AUTONOMOUS_DIR/FINAL_REPORT.md`
 - Append completion note to insights.md
 - STOP the loop
 
@@ -388,84 +401,97 @@ If NOT all met:
 - Continue to next loop cycle
 
 ### 5.5. Create PR for Iteration
-
-If there are commits on the iteration branch:
+After debug phase completes, if there are commits on the iteration branch:
 
 ```bash
+# Check if we have commits beyond origin/main
 COMMIT_COUNT=$(git -C "$ITER_WORKTREE_PATH" log --oneline origin/main..HEAD | wc -l)
 if [ "$COMMIT_COUNT" -gt 0 ]; then
     COMMIT_LOG=$(git -C "$ITER_WORKTREE_PATH" log --oneline origin/main..HEAD)
     PR_TITLE="auto/${AGENT_ID}/iter-${iteration}: ${goal_summary}"
     PR_BODY="## Summary
 - Agent: ${AGENT_ID}
-- Iteration: ${iteration}
-- Goal: $(head -1 $AGENT_DIR/goal.md)
+- Autonomous iteration ${iteration}
+- Goal: $(head -1 $AUTONOMOUS_DIR/goal.md)
 
 ## Changes
 ${COMMIT_LOG}
 
 ## Test Results
-- Tests: $(grep -m1 'tests_passed' $PHASE_DIR/debug_report.md 2>/dev/null || echo 'pending')
-- Verification: $(grep -m1 'Status:' $PHASE_DIR/debug_report.md 2>/dev/null || echo 'pending')
+- Tests passed: $(grep -m1 'tests_passed' $AUTONOMOUS_DIR/iterations/${iteration}/debug_report.md 2>/dev/null || echo 'pending')
+- Verification: $(grep -m1 'Status:' $AUTONOMOUS_DIR/iterations/${iteration}/debug_report.md 2>/dev/null || echo 'pending')
 
 ## Artifacts
-- Phase dir: $PHASE_DIR
+- GSD phase: .planning/phases/auto-${AGENT_ID}-iter-${iteration}/
+- Debug report: .eng-auto/${AGENT_ID}/iterations/${iteration}/
 
 > Auto-generated by eng-auto-loop agent ${AGENT_ID} iteration ${iteration}."
 
-    PR_URL=$(bash "$GIT_WORKFLOW" create-pr "$ITER_WORKTREE_PATH" "$PR_TITLE" "$PR_BODY")
+    PR_URL=$(bash ~/multiagent/scripts/git-workflow.sh create-pr "$ITER_WORKTREE_PATH" "$PR_TITLE" "$PR_BODY")
 fi
 ```
 
-Record `pr_url` in state.json. After PR creation, cleanup worktree:
+Record `pr_url` in state.json. If PR creation fails, log warning and continue (non-blocking).
+
+After PR creation, cleanup the iteration worktree:
 ```bash
-bash "$GIT_WORKFLOW" cleanup "$ITER_WORKTREE_PATH"
+bash ~/multiagent/scripts/git-workflow.sh cleanup "$ITER_WORKTREE_PATH"
 ```
 
 ### 5.7. Generate Iteration Report
 
-Generate `$PHASE_DIR/REPORT.md` — the primary human-readable output for this iteration. Must contain exact numbers.
+Generate `$AUTONOMOUS_DIR/iterations/<N>/REPORT.md` — the primary human-readable output for this iteration. This report must contain exact numbers, not summaries.
 
-Read source files:
-- `$PHASE_DIR/*-SUMMARY.md` — implementation details
-- `$PHASE_DIR/*-VERIFICATION.md` — verification results
-- `$PHASE_DIR/debug_report.md` — test results table
-- `$PHASE_DIR/test_results.json` — structured test data (fallback)
-- `state.json` — branch, PR URL, timing
+Read these source files to populate the report:
+- `$GSD_PHASE_DIR/*-SUMMARY.md` files (one per plan/wave) — for implementation details
+- `$GSD_PHASE_DIR/*-VERIFICATION.md` — for verification results and must-have status
+- `$AUTONOMOUS_DIR/iterations/<N>/debug_report.md` — for test results table and debug attempts
+- `$AUTONOMOUS_DIR/iterations/<N>/execution.md` — for file change counts
+- `state.json` — for branch, PR URL, timing
 
 ```bash
+ITER_DIR="$AUTONOMOUS_DIR/iterations/${iteration}"
+REPORT_FILE="$ITER_DIR/REPORT.md"
+START_TS=$(python3 -c "import json; print(json.load(open('$AUTONOMOUS_DIR/state.json')).get('started_at','unknown'))")
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+PR_NUM=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+' || echo "pending")
+GOAL_TEXT=$(cat "$AUTONOMOUS_DIR/goal.md")
 
 # Collect wave/plan summaries from SUMMARY.md files
 WAVE_TABLE=""
-for summary in "$PHASE_DIR"/*-SUMMARY.md; do
+for summary in "$GSD_PHASE_DIR"/*-SUMMARY.md; do
   [ -f "$summary" ] || continue
   PLAN_NUM=$(basename "$summary" | grep -oP '\d+-SUMMARY' | grep -oP '^\d+')
+  # Extract key info: what was built, files changed
   BUILT=$(grep -A2 'What was built\|Changes Made\|Summary' "$summary" 2>/dev/null | head -3 | tr '\n' ' ')
   FILES=$(grep -c '^[+-]' "$summary" 2>/dev/null || echo "?")
   WAVE_TABLE="${WAVE_TABLE}| ${PLAN_NUM} | Plan ${PLAN_NUM} | ${BUILT} | ${FILES} files |\n"
 done
 
-# Extract test results from debug_report.md
+# Extract test results from debug_report.md (Results table)
+# Uses REPORT_TABLE_START/END markers written by eng-auto-debug
 TEST_RESULTS=""
 DEBUG_ATTEMPTS="0"
-if [ -f "$PHASE_DIR/debug_report.md" ]; then
-  # Primary: extract between REPORT_TABLE markers
-  TEST_RESULTS=$(sed -n '/REPORT_TABLE_START/,/REPORT_TABLE_END/{/REPORT_TABLE/d;p}' "$PHASE_DIR/debug_report.md" 2>/dev/null)
-  # Fallback: match table header
+if [ -f "$ITER_DIR/debug_report.md" ]; then
+  # Primary: extract between REPORT_TABLE markers (written by eng-auto-debug)
+  TEST_RESULTS=$(sed -n '/REPORT_TABLE_START/,/REPORT_TABLE_END/{/REPORT_TABLE/d;p}' "$ITER_DIR/debug_report.md" 2>/dev/null)
+  # Fallback: if markers missing, match table header directly
   if [ -z "$TEST_RESULTS" ]; then
-    TEST_RESULTS=$(sed -n '/^| Check/,/^$/p' "$PHASE_DIR/debug_report.md" 2>/dev/null)
+    TEST_RESULTS=$(sed -n '/^| Check/,/^$/p' "$ITER_DIR/debug_report.md" 2>/dev/null)
   fi
-  DEBUG_ATTEMPTS=$(grep -oP '(?:sub-loop:|Attempts:)\s*\K\d+' "$PHASE_DIR/debug_report.md" 2>/dev/null | head -1 || echo "0")
+  # Extract debug attempt count — matches "Debug sub-loop: N/3" or "Debug Attempts: N"
+  DEBUG_ATTEMPTS=$(grep -oP '(?:sub-loop:|Attempts:)\s*\K\d+' "$ITER_DIR/debug_report.md" 2>/dev/null | head -1 || echo "0")
 fi
 
-# Secondary fallback: parse test_results.json
-if [ -f "$PHASE_DIR/test_results.json" ] && [ -z "$TEST_RESULTS" ]; then
+# Secondary: if test_results.json exists, use it for precise counts
+if [ -f "$ITER_DIR/test_results.json" ] && [ -z "$TEST_RESULTS" ]; then
   TEST_RESULTS=$(python3 -c "
 import json
-r = json.load(open('$PHASE_DIR/test_results.json'))
+r = json.load(open('$ITER_DIR/test_results.json'))
 s = r.get('suites', {})
 print('| Check | Status | Details |')
 print('|-------|--------|---------|')
+# Verification row comes from VERIFICATION.md, handled separately
 u = s.get('unit', {})
 print(f'| Unit tests | {\"pass\" if u.get(\"status\")==\"PASSED\" else \"fail\"} | {u.get(\"passed\",0)}/{u.get(\"total\",0)} ({u.get(\"duration_seconds\",0)}s) |')
 t = s.get('typecheck', {})
@@ -477,10 +503,10 @@ print(f'| Lint | {\"pass\" if l.get(\"status\")==\"PASSED\" else \"fail\"} | {l.
 " 2>/dev/null)
 fi
 
-# Extract verification status from VERIFICATION.md
+# Extract verification status
 VERIFY_STATUS="pending"
 MUST_HAVES="0/0"
-for vfile in "$PHASE_DIR"/*-VERIFICATION.md; do
+for vfile in "$GSD_PHASE_DIR"/*-VERIFICATION.md; do
   [ -f "$vfile" ] || continue
   VERIFY_STATUS=$(grep -oP '(?:Status|Verdict):\s*\K\S+' "$vfile" 2>/dev/null | head -1 || echo "unknown")
   MH_PASS=$(grep -c '✅\|PASS\|met' "$vfile" 2>/dev/null || echo "0")
@@ -489,7 +515,7 @@ for vfile in "$PHASE_DIR"/*-VERIFICATION.md; do
 done
 ```
 
-Write the report to `$PHASE_DIR/REPORT.md`:
+Write the report:
 ```markdown
 ## Engineering Report: {AGENT_ID} — Iteration {N}
 **Branch:** auto/{AGENT_ID}-iter-{N} | **PR:** [#{pr_num}]({pr_url}) | **Duration:** {elapsed}
@@ -501,6 +527,8 @@ Write the report to `$PHASE_DIR/REPORT.md`:
 | Wave | Plan | What was built | Files changed |
 |------|------|----------------|---------------|
 {populated from SUMMARY.md files — one row per plan}
+
+**Key decisions:** {any deviations from plan, extracted from SUMMARY.md deviation sections}
 
 ### Results
 | Check | Status | Details |
@@ -514,37 +542,38 @@ Write the report to `$PHASE_DIR/REPORT.md`:
 **Debug sub-loop:** {attempts}/{max_attempts} attempts
 
 ### Checks / Feedback
-{Full content from VERIFICATION.md}
+{Full content from VERIFICATION.md — include all must-have check details}
 
 ### PR Link
 [PR #{num}: {title}]({url})
 ```
 
-Extraction priority for Results table:
-1. **Primary:** Between `REPORT_TABLE_START` / `REPORT_TABLE_END` markers in debug_report.md
-2. **Fallback:** Match `| Check` table header in debug_report.md
-3. **Secondary:** Parse test_results.json for precise counts
+The Results table must use exact numbers from test execution, not approximations. Extraction priority:
+1. **Primary:** Extract between `REPORT_TABLE_START` / `REPORT_TABLE_END` markers in `debug_report.md` (written by eng-auto-debug)
+2. **Fallback:** Match `| Check` table header in `debug_report.md`
+3. **Secondary fallback:** Parse `test_results.json` for precise counts (`duration_seconds`, `error_count`, `warning_count` fields)
 
 ### 6. CONTEXT MANAGEMENT
-
 After every iteration, write a checkpoint:
 
-**Update insights.md** — append iteration summary:
+**Update insights.md** -- append a summary of this iteration:
 ```markdown
-### Iteration <N> — <timestamp>
+### Iteration <N> -- <timestamp>
 - Status: <SUCCESS/PARTIAL/FAILED>
-- Phase dir: `$PHASE_DIR`
+- GSD phase: `.planning/phases/auto-${AGENT_ID}-iter-<N>/`
 - Plans executed: <count>
 - Changes made: <brief list>
-- Tests: <passed/failed — summary>
+- Tests: <passed/failed — summary of failures if any>
 - Key finding: <most important insight>
 - Goal progress: <X of Y requirements met>
 - Branch: <branch name>
 - PR: <PR URL or "pending">
-- Next action: <focus for next iteration>
+- Next action: <what the next iteration should focus on>
 ```
 
-**Update state.json** with current iteration, timestamp, and `iterations_summary` array:
+**Update state.json** with current iteration and timestamp.
+
+Also update `iterations_summary` array in state.json to track per-iteration info:
 ```json
 {
   "iterations_summary": [
@@ -554,12 +583,13 @@ After every iteration, write a checkpoint:
       "pr_url": "$PR_URL",
       "status": "SUCCESS/PARTIAL/FAILED",
       "tests_passed": true,
-      "goal_progress": "X of Y",
-      "phase_dir": "$PHASE_DIR"
+      "goal_progress": "X of Y"
     }
   ]
 }
 ```
+
+This ensures that if context is lost (context window limit, crash, overnight restart), the next invocation can read these files and pick up exactly where it left off.
 
 ### 7. LOOP CONTROL
 ```
@@ -575,7 +605,7 @@ else:
 
 ## Final Report Format
 
-When goal is met (or max iterations reached), write `$AGENT_DIR/FINAL_REPORT.md`:
+When the goal is met (or max iterations reached), write `$AUTONOMOUS_DIR/FINAL_REPORT.md`:
 
 ```markdown
 # Autonomous Engineering Loop Final Report
@@ -589,12 +619,13 @@ Completed: <timestamp>
 ## Iterations: <N> of <max>
 
 ## Summary
-<2-3 paragraph summary>
+<2-3 paragraph summary of what happened across all iterations>
 
 ## Verification Requirements
-| Requirement | Status | Evidence | Iteration |
-|------------|--------|----------|-----------|
+| Requirement | Status | Evidence | Iteration Achieved |
+|------------|--------|----------|-------------------|
 | Req 1 | MET/NOT MET | <evidence> | <N> |
+| Req 2 | MET/NOT MET | <evidence> | <N> |
 
 ## Test Results
 | Iteration | Tests Passed | Failures | Debug Attempts |
@@ -602,37 +633,51 @@ Completed: <timestamp>
 | 1 | Yes/No | <count> | <count> |
 
 ## Key Insights
-<bulleted list>
+<bulleted list of the most important things learned>
 
 ## Changes Applied
-<cumulative list across all iterations>
+<cumulative list of all code changes across all iterations>
+
+## GSD Phase Directories
+<list of all .planning/phases/auto-${AGENT_ID}-iter-<N>/ directories with their artifacts>
 
 ## Errors Encountered and Resolved
-<list>
+<list of all errors and their fixes>
 
 ## Recommendations
-<what to do next>
+<what to do next, if anything>
 ```
 
-## Recovery from Context Loss
+## Recovery from Context Loss (Dual-Level)
 
 If invoked and state.json shows `status: "running"`:
 
-1. Read iteration number from state.json
-2. Set `PHASE_DIR=".planning/phases/auto-${AGENT_ID}-iter-${iteration}"`
-3. Determine resume point from artifacts in `$PHASE_DIR`:
-   - No CONTEXT.md → start from planning
-   - CONTEXT.md exists, no PLAN.md → resume planning (researcher/planner)
-   - PLAN.md exists, no SUMMARY.md → resume from execution
-   - SUMMARY.md exists, no VERIFICATION.md → resume execution (verifier)
-   - VERIFICATION.md exists, no debug_report.md → resume from debug
-   - debug_report.md exists → check Codex reviews, then start next iteration
-4. Check for codex review files in `$PHASE_DIR` to determine if post-phase reviews ran
-5. Read insights.md for accumulated context
-6. Continue from resume point
+### Level 0 Recovery (Autonomous State)
+1. Read the last iteration number from state.json
+2. Check which phase was last completed by looking for files:
+   - plan.md exists but not execution.md -> resume from execution
+   - execution.md exists but not debug_report.md -> resume from debug
+   - debug_report.md exists -> start next iteration
+
+### Level 1 Recovery (GSD Artifacts)
+3. Check GSD artifacts in `.planning/phases/auto-${AGENT_ID}-iter-<N>/` for granular resume point:
+   - CONTEXT.md exists but no RESEARCH.md -> resume eng-auto-plan from researcher
+   - RESEARCH.md exists but no PLAN.md -> resume eng-auto-plan from planner
+   - PLAN.md exists but no SUMMARY.md -> resume eng-auto-execute from executor
+   - SUMMARY.md exists but no VERIFICATION.md -> resume eng-auto-execute from verifier
+   - VERIFICATION.md exists -> eng-auto-execute is done, check for execution.md bridge file
 
 ### Worktree Recovery
-If `state.json` has `worktree_path` but directory doesn't exist:
-- Check if branch exists: `git branch --list "$ITER_BRANCH"`
-- If branch exists, re-create worktree: `git-workflow.sh create-worktree "$ITER_BRANCH"`
-- If branch doesn't exist, start fresh from origin/main
+4. Check for orphaned worktrees from previous iterations:
+   - If `state.json` has `worktree_path` but the directory doesn't exist:
+     - Check if the branch still exists: `git branch --list "$ITER_BRANCH"`
+     - If branch exists, re-create worktree: `git-workflow.sh create-worktree "$ITER_BRANCH"`
+     - If branch doesn't exist, start fresh from origin/main
+   - If `agent_branches` has entries with `merged: false`:
+     - Check if the agent worktree still exists
+     - If it does, attempt merge into iteration worktree
+     - If not, check if branch exists and re-create worktree from branch
+     - Skip agents that are already merged
+
+5. Read insights.md for accumulated context
+6. Continue the loop from where it left off, passing the appropriate resume point to the Level 1 agent

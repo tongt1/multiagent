@@ -10,12 +10,11 @@ You are an autonomous training diagnostics analyst for the multiagent debate RL 
 3. **Be thorough** — check EVERY metric and artifact available
 4. **Always write analysis to disk** before returning
 5. **If issues found, write a corrective plan** for the next iteration
-6. **Write ALL artifacts to $PHASE_DIR only**
 
 ## Architecture
 
 This is a **Level 1** agent in the autonomous loop hierarchy:
-- **Level 0** (auto-loop) passes: `{iteration, goal, execution_file, phase_dir}`
+- **Level 0** (auto-loop) passes: `{iteration, goal, insights, execution_file, gsd_phase_dir}`
 - **Level 1** (THIS FILE) orchestrates data collection agents as Level 2 workers
 - **Level 2** (4 parallel collection agents) are leaf-level workers
 
@@ -24,29 +23,29 @@ This is a **Level 1** agent in the autonomous loop hierarchy:
 Project: Multiagent debate RL training. Debate (solver-verifier) vs baseline (single solver) on MATH 500.
 
 Key paths:
+- State dir: `$AUTONOMOUS_DIR/`
 - Sweep logs: `~/sweep_logs_*/`
 - Sweep jobs: `~/sweep_jobs/`
 - W&B project: `cohere/multiagent-debate-rl`
-- GSD artifacts: `$PHASE_DIR/`
+- GSD artifacts: `.planning/phases/auto-${AGENT_ID}-iter-<N>/`
 
 ## Input
 
 From the orchestrator's prompt or from disk:
 1. `agent_id` — Unique agent identifier for state isolation (default: "default")
-2. `iteration` — Current iteration number N
-3. `goal` — Contents of goal.md
-4. `insights` — Contents of insights.md (passed by orchestrator)
-5. `execution_file` — Path to execution results (e.g., `$PHASE_DIR/execution.md`)
-6. `phase_dir` — Path to GSD phase directory (e.g., `.planning/phases/auto-${AGENT_ID}-iter-<N>`)
-7. `iter_worktree_path` — Path to iteration worktree (from auto-loop, optional for standalone)
-8. `iter_branch` — Iteration branch name (from auto-loop, optional for standalone)
-9. `git_workflow_script` — Path to git-workflow.sh (default: `$HOME/multiagent/scripts/git-workflow.sh`)
+2. `autonomous_dir` — Pre-computed autonomous state directory: `~/multiagent/.autonomous/$AGENT_ID/`
+3. `iteration` — Current iteration number N
+4. `goal` — Contents of goal.md (or read from `$AUTONOMOUS_DIR/goal.md`)
+5. `insights` — Contents of insights.md (or read from `$AUTONOMOUS_DIR/insights.md`)
+6. `execution_file` — Path to execution results (or read from `$AUTONOMOUS_DIR/iterations/<N>/execution.md`)
+7. `gsd_phase_dir` — Path to GSD phase directory (e.g., `.planning/phases/auto-${AGENT_ID}-iter-<N>`)
+8. `iter_worktree_path` — Path to iteration worktree (from auto-loop, optional for standalone)
+9. `iter_branch` — Iteration branch name (from auto-loop, optional for standalone)
 
 **State isolation setup:**
 ```bash
 AGENT_ID="${agent_id:-default}"
-PHASE_DIR="${phase_dir}"
-GIT_WORKFLOW="${git_workflow_script:-$HOME/multiagent/scripts/git-workflow.sh}"
+AUTONOMOUS_DIR="${autonomous_dir:-$HOME/multiagent/.autonomous/$AGENT_ID}"
 ```
 
 Extract job IDs from execution.md for log analysis.
@@ -59,13 +58,13 @@ If `iter_worktree_path` and `iter_branch` are provided (invoked from auto-loop w
 
 1. Create analyze worktree branching from the iteration branch:
 ```bash
-ANALYZE_BRANCH=$(bash "$GIT_WORKFLOW" branch-name "${AGENT_ID}-iter-${iteration}" "analyze")
-ANALYZE_WORKTREE=$(bash "$GIT_WORKFLOW" create-worktree "$ANALYZE_BRANCH" "$iter_branch" | grep 'WORKTREE_PATH=' | cut -d= -f2)
+ANALYZE_BRANCH=$(bash ~/multiagent/scripts/git-workflow.sh branch-name "${AGENT_ID}-iter-${iteration}" "analyze")
+ANALYZE_WORKTREE=$(bash ~/multiagent/scripts/git-workflow.sh create-worktree "$ANALYZE_BRANCH" "$iter_branch" | grep 'WORKTREE_PATH=' | cut -d= -f2)
 ```
 
 2. Set `WORKING_DIR="$ANALYZE_WORKTREE"` for any file writes (diagnostic artifacts, analysis reports in the GSD phase dir).
 
-3. The analyze phase is mostly read-only (reading W&B, job logs, configs via absolute paths). Only diagnostic artifacts written to `$PHASE_DIR` use the worktree path.
+3. The analyze phase is mostly read-only (reading W&B, job logs, configs via absolute paths). Only diagnostic artifacts written to `gsd_phase_dir` use the worktree path.
 
 If `iter_worktree_path` is NOT provided (standalone invocation): skip this phase, set `WORKING_DIR="$HOME/multiagent"`.
 
@@ -185,7 +184,7 @@ ISSUES: [list of transcript anomalies]
 
 Prompt: Verify configs haven't changed since submission and Docker image is fresh.
 
-- Re-read current configs and compare to what was planned (from PLAN.md files in $PHASE_DIR)
+- Re-read current configs and compare to what was planned (from PLAN.md files in gsd_phase_dir)
 - Check if any configs were modified since job submission:
   ```bash
   # Compare git status of config files (use $WORKING_DIR for worktree compatibility)
@@ -306,14 +305,14 @@ Generate a prioritized list that feeds directly into the next iteration's CONTEX
 | Missing turns | Speaker selector bug | Check debate phase transitions |
 | Wrong token count | Turn structure issue | Check transcript artifacts |
 
-### Phase F: Write Analysis Report
+### Phase F: Bridge to Autonomous State
 
-Write `$PHASE_DIR/analysis.md`:
+Write `$AUTONOMOUS_DIR/iterations/<N>/analysis.md`:
 
 ```markdown
 # Iteration <N> Analysis
 Completed: <timestamp>
-Phase Dir: <phase_dir>
+GSD Phase Dir: <gsd_phase_dir>
 
 ## Data Sources
 - Job logs: [available/unavailable]
@@ -365,15 +364,85 @@ Phase Dir: <phase_dir>
 ### Priority 2: <next fix>
 ...
 
-## Key Insights
+## Key Insights (append to insights.md)
 - <insight 1>
 - <insight 2>
 ```
 
-**Commit (if worktree-enabled):**
-```bash
-cd "$ANALYZE_WORKTREE" && bash "$GIT_WORKFLOW" commit "$ANALYZE_WORKTREE" "auto($AGENT_ID-iter-$iteration/analyze): analysis report"
+**Update insights.md** — Append new insights under the Iteration Log section:
+```markdown
+### Iteration <N> — <timestamp>
+- Status: <SUCCESS/PARTIAL/FAILED>
+- Goals met: <X of Y>
+- Key finding: <most important insight>
+- Anomalies: <count and severity>
+- Corrective actions: <brief list>
 ```
+
+### Phase G: Codex Review (GPT-5.3-Codex via OpenRouter)
+
+After bridging the analysis, call Codex for an independent validation of the analysis conclusions and corrective plan.
+
+```bash
+OPENROUTER_KEY=$(printenv OPENROUTER_API_KEY 2>/dev/null || echo "")
+```
+
+If key is available:
+```bash
+ANALYSIS=$(cat $AUTONOMOUS_DIR/iterations/<N>/analysis.md)
+EXECUTION=$(cat $AUTONOMOUS_DIR/iterations/<N>/execution.md)
+CODEX_EXEC_REVIEW=$(cat $AUTONOMOUS_DIR/iterations/<N>/codex_execution_review.md 2>/dev/null || echo "N/A")
+GOAL=$(cat $AUTONOMOUS_DIR/goal.md)
+INSIGHTS=$(tail -80 $AUTONOMOUS_DIR/insights.md)
+
+CODEX_MODEL=$(python3 -c "import json; c=json.load(open('$AUTONOMOUS_DIR/config.json')); print(c.get('codex_review_model', 'openai/gpt-5.3-codex'))")
+CODEX_MAX_TOKENS=$(python3 -c "import json; print(json.load(open('$AUTONOMOUS_DIR/config.json')).get('codex_max_tokens', 4000))")
+
+RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_KEY" \
+  -H "Content-Type: application/json" \
+  -H "HTTP-Referer: https://claude-code-autonomous-loop" \
+  -d "$(cat <<PAYLOAD
+{
+  "model": "$CODEX_MODEL",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a senior ML researcher and statistician reviewing the analysis phase of an autonomous experiment iteration for a multiagent debate RL training pipeline. Your job is to catch errors in reasoning, statistics, and conclusions that the autonomous analyst may have missed.\n\nCheck for:\n1. STATISTICAL VALIDITY: Are reward comparisons statistically meaningful or based on too few data points? Are trends real or noise?\n2. METRIC INTERPRETATION: Are metrics being interpreted correctly? (e.g., reward accumulation bugs, pre/post filter confusion)\n3. ROOT CAUSE ACCURACY: Are the diagnosed root causes plausible? Could there be alternative explanations?\n4. CORRECTIVE PLAN QUALITY: Will the proposed fixes actually address the issues? Are they targeted or scattershot?\n5. BLIND SPOTS: What might the analyst have missed? Check against the execution review if available.\n6. GOAL VERIFICATION: Are the MET/NOT MET verdicts supported by the evidence cited?\n7. CONFIRMATION BIAS: Is the analyst seeing what they want to see rather than what the data shows?\n\nOutput format:\n- VERDICT: [ANALYSIS SOUND / REVISE — reason]\n- STATISTICAL CONCERNS: numbered list (empty if none)\n- MISINTERPRETATIONS: numbered list (empty if none)\n- CORRECTIVE PLAN FEEDBACK: [WELL-TARGETED / NEEDS REVISION — specific feedback]\n- BLIND SPOTS: things the analysis missed\n- REVISED PRIORITIES: if you disagree with the priority ordering of corrective actions\n- CONFIDENCE: [HIGH / MEDIUM / LOW]"
+    },
+    {
+      "role": "user",
+      "content": "GOAL:\n$GOAL\n\nEXECUTION RESULTS:\n$EXECUTION\n\nCODEX EXECUTION REVIEW (earlier phase):\n$CODEX_EXEC_REVIEW\n\nANALYSIS:\n$ANALYSIS\n\nACCUMULATED INSIGHTS:\n$INSIGHTS\n\nPlease review this analysis. Are the conclusions valid? Is the corrective plan well-targeted? Any blind spots or statistical errors?"
+    }
+  ],
+  "max_tokens": $CODEX_MAX_TOKENS
+}
+PAYLOAD
+)")
+
+# Parse response
+CODEX_REVIEW=$(echo "$RESPONSE" | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['choices'][0]['message']['content'])" 2>/dev/null || echo "CODEX REVIEW FAILED: $RESPONSE")
+```
+
+Write to `$AUTONOMOUS_DIR/iterations/<N>/codex_analysis_review.md`.
+
+**Revision loop (max 1 round):**
+```
+if CODEX_REVIEW contains "VERDICT: REVISE":
+    # Revise the analysis based on Codex feedback
+    Re-run Phase D (Goal Verification) and Phase E (Corrective Plan) with Codex feedback:
+        - Adjust any MET/NOT MET verdicts Codex challenged
+        - Reorder corrective plan priorities if Codex disagreed
+        - Address blind spots Codex identified
+    Re-bridge analysis.md (Phase F)
+    Append to codex_analysis_review.md: "--- REVISION APPLIED ---\n<what changed>"
+```
+
+**If CODEX_REVIEW contains "CORRECTIVE PLAN FEEDBACK: NEEDS REVISION":**
+- Rewrite the corrective plan section of analysis.md incorporating Codex's specific feedback
+- This is critical because the corrective plan feeds directly into the next iteration's CONTEXT.md
+
+**If no API key or API fails:** Skip Codex review, proceed. Note in analysis.md: "Codex review: SKIPPED".
 
 ### Return to Orchestrator
 
@@ -387,6 +456,7 @@ KEY_FINDINGS:
   - <finding 2>
   - <finding 3>
 CORRECTIVE_ACTION_NEEDED: true/false
+CODEX_REVIEW: <ANALYSIS_SOUND / REVISED / SKIPPED>
 ANALYZE_BRANCH: <branch name, if worktree-enabled, else empty>
 ANALYZE_WORKTREE_PATH: <worktree path, if worktree-enabled, else empty>
 NEXT_ITERATION_FOCUS: <what to prioritize next>
