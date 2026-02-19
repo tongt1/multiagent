@@ -111,7 +111,7 @@ Plans:
 
 **Requirements:** QUAL-01, QUAL-02, QUAL-03, QUAL-04
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 05-01-PLAN.md -- Compute qualitative metrics (P:Q ratio, first-turn planning, specificity) and correlate with merge outcomes
