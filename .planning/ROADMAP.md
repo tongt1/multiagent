@@ -111,6 +111,11 @@ Plans:
 
 **Requirements:** QUAL-01, QUAL-02, QUAL-03, QUAL-04
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 05-01-PLAN.md -- Compute qualitative metrics (P:Q ratio, first-turn planning, specificity) and correlate with merge outcomes
+
 **Success Criteria:**
 1. Plan:Question ratio is computed per trajectory and its correlation with merge conflict outcomes is reported (e.g., higher planning correlates with fewer conflicts).
 2. Trajectories with first-turn planning (Plan message in the first turn) are identified, and the conflict rate reduction compared to trajectories without first-turn planning is quantified.
@@ -127,7 +132,7 @@ Plans:
 | 2 | Results Collection and Data Foundation | Complete | 5 | 3/3 |
 | 3 | Analysis Modules | Complete | 10 | 3/3 |
 | 4 | Figure Generation and Paper Comparison | Complete | 4 | 2/2 |
-| 5 | Qualitative Transcript Analysis | Not Started | 4 | -- |
+| 5 | Qualitative Transcript Analysis | Planned | 4 | 0/1 |
 
 **Total:** 27/30 requirements complete
 
