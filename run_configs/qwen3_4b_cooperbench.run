@@ -8,8 +8,8 @@ minizord.eval.name = "flink_eval"
 minizord.eval.n_generation_steps = 4
 use_fixed_eval_set = False
 
-train_batch_size = 2
-eval_batch_size = 2
+train_batch_size = 4
+eval_batch_size = 4
 
 # -- sampling config during training -- #
 sample.decode_loop_unroll = 4
@@ -24,7 +24,7 @@ objective.loss.kwargs = {
         "use_reference_policy": True,
         "beta": 0.03,
         "avg_loglikelihood": False,
-        "generations_per_prompt": 2,
+        "generations_per_prompt": 4,
     },
     "n_grad_steps_per_batch": 1,
     "kl_top_k": 0,
