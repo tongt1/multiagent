@@ -93,6 +93,16 @@ _DAPO_OVERLONG_COEFF = 0.5                  # halve gradient for overlong sequen
 _DAPO_OVERLONG_THRESHOLD = 0.9              # trigger overlong clipping at 90% of max_sequence_length
 _DAPO_MIN_VALID_PER_GROUP = 2               # minimum valid generations per prompt group
 _DAPO_MAX_BATCH_MASK_RATIO = 0.5            # skip training step if >50% of batch is masked
+_REDUNDANCY_FACTOR = 1.25                   # 25% extra rollouts for failure tolerance
+
+# Phase 5: Docker Warmup and Rollout Speed Optimizations
+# =====================================================
+# 1. Container Pool: Docker containers persist across rollouts (no cold-start)
+# 2. Async Decoupling: actors_queue_batches=32 keeps rollouts ahead of trainer
+# 3. Weight Export: export_every_steps=2 with async background export
+# 4. Trajectory Dispatch: Fine-grained interleaving via AgenticTrajectoryDispatcher
+# 5. Redundant Rollouts: redundancy_factor=1.25 handles ~39% agentic failure rate
+# 6. Rollout Timing: Per-task duration tracked for future sorted batching
 
 
 class Qwen3_4bCooperBench(sweep_base.Sweep):
@@ -186,6 +196,8 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     agentic_max_iterations=_MAX_TURNS,
                     agentic_rollout_timeout=900,  # 15 min per rollout
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
+                    max_concurrent_trajectories=0,  # 0 = default to num_unrolls * redundancy_factor
+                    agentic_redundancy_factor=_REDUNDANCY_FACTOR,
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 # Pipeline depth for async rollout-train decoupling.
@@ -219,6 +231,8 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         agentic_max_iterations=_MAX_TURNS,
                         agentic_rollout_timeout=900,
                         agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
+                        max_concurrent_trajectories=0,
+                        agentic_redundancy_factor=1.0,  # No redundancy for eval (single gen per prompt)
                     ),
                 ),
                 log_train_generations_every_steps=1,
