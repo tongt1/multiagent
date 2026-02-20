@@ -1,9 +1,14 @@
-"""Qwen3-4B CooperBench: Agentic mode with Docker-based verifiable rewards.
+"""Qwen3-4B CooperBench: Agentic mode with DAPO loss and Docker-based verifiable rewards.
 
 Agentic mode: Model interacts with code through OpenHands tools (bash, file editor)
 across multiple turns. Each generation runs an agent loop in a Docker container
 pointed at the vLLM sidecar. Much slower than single-turn (~5-15 min per rollout)
 but produces dramatically better patches.
+
+DAPO loss (default): Masks degenerate trajectories (timeouts, container errors, zero
+reward, max turns), normalizes by max_sequence_length (no length bias), and clips
+overlong trajectories. Set _LOSS_VARIATION to "grpo" or "gspo" to use standard
+loss variants instead.
 
 To disable agentic mode and use single-turn generation:
 Set agentic_mode=False in actor config below.
@@ -36,6 +41,9 @@ from post_training.flink.components.flink_learner_rloo import FlinkRlooLearnerCo
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
+from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
+from post_training.flink.components.flink_learning_filter.filter_dapo_degenerate import FilterDapoDegenerateConfig
+from post_training.flink.components.flink_learning_filter import FilterMode
 
 from configs.model_profiles import QWEN3_4B_INSTRUCT
 
@@ -64,6 +72,18 @@ _EXPORT_EVERY_STEPS = 1
 _TRAIN_BATCH_SIZE = 4
 _EVAL_BATCH_SIZE = 4
 _GENERATIONS_PER_PROMPT = 4
+
+# DAPO / Loss configuration
+# To revert to standard GRPO/GSPO, change _LOSS_VARIATION and remove FilteringStreamerConfig
+# from actor_outputs_streamers below. All other config stays the same.
+_LOSS_VARIATION = "dapo"                    # "dapo" | "grpo" | "gspo" | "grpo_use_ref_policy_as_pi_old" | "gspo_use_ref_policy_as_pi_old"
+_TEMPERATURE_TRAIN = 1.0                    # sampling temperature for training rollouts
+_TEMPERATURE_EVAL = 0.6                     # sampling temperature for eval rollouts
+_MAX_TURNS = 20                             # agentic_max_iterations
+_DAPO_OVERLONG_COEFF = 0.5                  # halve gradient for overlong sequences
+_DAPO_OVERLONG_THRESHOLD = 0.9              # trigger overlong clipping at 90% of max_sequence_length
+_DAPO_MIN_VALID_PER_GROUP = 2               # minimum valid generations per prompt group
+_DAPO_MAX_BATCH_MASK_RATIO = 0.5            # skip training step if >50% of batch is masked
 
 
 class Qwen3_4bCooperBench(sweep_base.Sweep):
@@ -103,10 +123,13 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         "rl_training_steps": 1,
                         "hard_update_ref_every_steps": 1,
                         "preference": {
-                            "loss_variation": "gspo_use_ref_policy_as_pi_old",
+                            "loss_variation": _LOSS_VARIATION,
                             "beta": 0.03,
                             "avg_loglikelihood": False,
                             "generations_per_prompt": _GENERATIONS_PER_PROMPT,
+                            # DAPO-specific loss parameters (ignored by GRPO/GSPO variants)
+                            "dapo_overlong_coeff": _DAPO_OVERLONG_COEFF,
+                            "dapo_overlong_threshold": _DAPO_OVERLONG_THRESHOLD,
                         },
                     },
                 },
@@ -122,7 +145,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         ),
                         export_every_steps=_EXPORT_EVERY_STEPS,
                         export_dir=_VLLM_EXPORT_DIR,
-                        temperature=1,
+                        temperature=_TEMPERATURE_TRAIN,
                     ),
                     eval_sampler_key=FlinkVllmSidecarSamplerConfig(
                         vllm_endpoint=EndpointResolverConfig(
@@ -131,7 +154,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         ),
                         export_every_steps=None,
                         export_dir=_VLLM_EXPORT_DIR,
-                        temperature=0.6,
+                        temperature=_TEMPERATURE_EVAL,
                         p=0.95,
                         max_sequence_length_at_evaluation=MAX_SEQUENCE_LENGTH,
                     ),
@@ -151,7 +174,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 actor=FlinkCombActorConfig(
                     sampler_endpoint_key="sampler_key",
                     agentic_mode=True,
-                    agentic_max_iterations=20,
+                    agentic_max_iterations=_MAX_TURNS,
                     agentic_rollout_timeout=900,  # 15 min per rollout
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                 ),
@@ -160,6 +183,16 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
+                    # DAPO compact filter: drops degenerate agentic trajectories before
+                    # advantage computation. Remove this entry to disable DAPO filtering
+                    # (e.g. when using _LOSS_VARIATION="grpo" or "gspo").
+                    FilteringStreamerConfig(
+                        filter=FilterDapoDegenerateConfig(
+                            filter_mode=FilterMode.ONLY,
+                            min_valid_per_group=_DAPO_MIN_VALID_PER_GROUP,
+                            max_batch_mask_ratio=_DAPO_MAX_BATCH_MASK_RATIO,
+                        ),
+                    ),
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=_GENERATIONS_PER_PROMPT,
                     ),
@@ -170,7 +203,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         sampler_endpoint_key="eval_sampler_key",
                         patch_number_of_generation_per_prompt=1,
                         agentic_mode=True,
-                        agentic_max_iterations=20,
+                        agentic_max_iterations=_MAX_TURNS,
                         agentic_rollout_timeout=900,
                         agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                     ),
