@@ -165,7 +165,11 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         ),
                         export_every_steps=_EXPORT_EVERY_STEPS,
                         export_dir=_VLLM_EXPORT_DIR,
-                        temperature=_TEMPERATURE_TRAIN,
+                        temperature=0.8,  # Fallback if anneal not active
+                        # Phase 3 (STAB-03): Linear temperature anneal 1.0 -> 0.6 over training
+                        start_temperature=1.0,
+                        end_temperature=0.6,
+                        total_train_steps=_TOTAL_TRAIN_STEPS,
                     ),
                     eval_sampler_key=FlinkVllmSidecarSamplerConfig(
                         vllm_endpoint=EndpointResolverConfig(
@@ -199,6 +203,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                     max_concurrent_trajectories=0,  # 0 = default to num_unrolls * redundancy_factor
                     agentic_redundancy_factor=_REDUNDANCY_FACTOR,
+                    agentic_temperature=0.8,  # Phase 3 (STAB-03): configurable agent LLM temperature
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 # Pipeline depth for async rollout-train decoupling.
@@ -248,6 +253,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                         max_concurrent_trajectories=0,
                         agentic_redundancy_factor=1.0,  # No redundancy for eval (single gen per prompt)
+                        agentic_temperature=0.8,  # Phase 3 (STAB-03): match train temperature
                     ),
                 ),
                 log_train_generations_every_steps=1,
