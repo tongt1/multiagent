@@ -1,8 +1,12 @@
-"""Qwen3-4B CooperBench: Solo mode with Docker-based verifiable rewards.
+"""Qwen3-4B CooperBench: Agentic mode with Docker-based verifiable rewards.
 
-Runs 100 training steps with Qwen3-4B on CooperBench data.
-Docker-based evaluation: actual test execution for verifiable rewards.
-Solo mode: single agent implements all features.
+Agentic mode: Model interacts with code through OpenHands tools (bash, file editor)
+across multiple turns. Each generation runs an agent loop in a Docker container
+pointed at the vLLM sidecar. Much slower than single-turn (~5-15 min per rollout)
+but produces dramatically better patches.
+
+To disable agentic mode and use single-turn generation:
+Set agentic_mode=False in actor config below.
 
 Usage:
     # Preview (no submission)
@@ -54,11 +58,11 @@ _VLLM_SIDECAR = "vllm"
 _VLLM_PORT = 8000
 _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
-# Training params: 100 steps, solo mode
-_TOTAL_TRAIN_STEPS = 100
+# Training params: 50 steps (reduced from 100 — each agentic step takes much longer)
+_TOTAL_TRAIN_STEPS = 50
 _EXPORT_EVERY_STEPS = 1
-_TRAIN_BATCH_SIZE = 2
-_EVAL_BATCH_SIZE = 2
+_TRAIN_BATCH_SIZE = 4
+_EVAL_BATCH_SIZE = 4
 _GENERATIONS_PER_PROMPT = 4
 
 
@@ -138,10 +142,18 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 input_data_preprocessor=CombItemsPreprocessorConfig(
                     env_name_remap={},
                     patch_data_item={},
-                    patch_scenario_config={},
+                    patch_scenario_config={
+                        "cooperbench": {
+                            "docker_timeout": 300,
+                        },
+                    },
                 ),
                 actor=FlinkCombActorConfig(
                     sampler_endpoint_key="sampler_key",
+                    agentic_mode=True,
+                    agentic_max_iterations=20,
+                    agentic_rollout_timeout=900,  # 15 min per rollout
+                    agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 actors_queue_batches=32,
@@ -157,6 +169,10 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     actor=FlinkCombActorConfig(
                         sampler_endpoint_key="eval_sampler_key",
                         patch_number_of_generation_per_prompt=1,
+                        agentic_mode=True,
+                        agentic_max_iterations=20,
+                        agentic_rollout_timeout=900,
+                        agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                     ),
                 ),
                 log_train_generations_every_steps=1,
