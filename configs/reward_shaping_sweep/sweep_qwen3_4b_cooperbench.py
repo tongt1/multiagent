@@ -43,7 +43,8 @@ from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
 from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
 from post_training.flink.components.flink_learning_filter.filter_dapo_degenerate import FilterDapoDegenerateConfig
-from post_training.flink.components.flink_learning_filter import FilterMode
+from post_training.flink.components.flink_learning_filter import FilterMode, FilterMultiplexerConfig
+from post_training.flink.components.flink_learning_filter.filter_zero_variance_group import FilterZeroVarianceGroupConfig
 
 from configs.model_profiles import QWEN3_4B_INSTRUCT
 
@@ -73,12 +74,12 @@ _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 # Staleness = current_train_step - rollout_policy_step, bounded by queue depth.
 # Target: 2-3 steps of staleness for 42% throughput improvement (Async-GRPO).
 
-# Training params: 50 steps (reduced from 100 — each agentic step takes much longer)
-_TOTAL_TRAIN_STEPS = 50
+# Training params: 250 steps for stability validation (Phase 3)
+_TOTAL_TRAIN_STEPS = 250
 # Export weights every 2 steps to reduce export overhead.
 # Rollouts using 1-step-old weights is acceptable (staleness ~2).
 _EXPORT_EVERY_STEPS = 2
-_TRAIN_BATCH_SIZE = 4
+_TRAIN_BATCH_SIZE = 16  # 4 prompts x 4 gens/prompt for batch diversity (STAB-01)
 _EVAL_BATCH_SIZE = 4
 _GENERATIONS_PER_PROMPT = 4
 
@@ -125,11 +126,11 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
             eval_batch_size=_EVAL_BATCH_SIZE,
             total_train_steps=_TOTAL_TRAIN_STEPS,
             max_sequence_length=MAX_SEQUENCE_LENGTH,
-            validation_every_steps=25,
-            n_gradient_accumulation_steps=1,
+            validation_every_steps=50,
+            n_gradient_accumulation_steps=2,  # Effective batch of 32 (STAB-01)
             lr_schedule={
                 "kwargs": {
-                    "warmup_steps": 10,
+                    "warmup_steps": 20,
                     "total_steps": _TOTAL_TRAIN_STEPS,
                     "peak_lr": 1e-6,
                     "end_lr": 1e-7,
@@ -154,7 +155,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 },
             },
             n_last_ckpts_to_keep=2,
-            checkpoint_every_steps=25,
+            checkpoint_every_steps=50,
             minizord=flink_zord.FlinkZordConfig(
                 samplers=dict(
                     sampler_key=FlinkVllmSidecarSamplerConfig(
@@ -216,6 +217,20 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                             filter_mode=FilterMode.ONLY,
                             min_valid_per_group=_DAPO_MIN_VALID_PER_GROUP,
                             max_batch_mask_ratio=_DAPO_MAX_BATCH_MASK_RATIO,
+                        ),
+                    ),
+                    # Phase 3 (STAB-02): Zero-variance prompt group filter.
+                    # Drops entire prompt groups where all generations have identical
+                    # reward (within epsilon), which produce zero GRPO advantage.
+                    FilteringStreamerConfig(
+                        filter=FilterMultiplexerConfig(
+                            filter_mode=FilterMode.ALL,
+                            filter_configs=[
+                                FilterZeroVarianceGroupConfig(
+                                    filter_mode=FilterMode.ALL,
+                                    epsilon=0.01,
+                                ),
+                            ],
                         ),
                     ),
                     DebateMetricStreamerConfig(
