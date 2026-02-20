@@ -38,3 +38,11 @@ LLAMA_1B_INSTRUCT = ModelProfile(
     max_sequence_length=4096,
     needs_mesh_override=False,
 )
+
+QWEN3_4B_INSTRUCT = ModelProfile(
+    ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
+    num_training_gpus=8,
+    num_sampling_gpus=8,
+    max_sequence_length=4096,
+    needs_mesh_override=False,
+)

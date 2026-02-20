@@ -1,23 +1,19 @@
-"""Qwen3-4B CooperBench: Agentic mode with Docker-based verifiable rewards.
+"""Qwen3-4B CooperBench DUAL-MODEL: freeze_verifier mode with Docker-based verifiable rewards.
 
-Agentic mode: Model interacts with code through OpenHands tools (bash, file editor)
-across multiple turns. Each generation runs an agent loop in a Docker container
-pointed at the vLLM sidecar. Much slower than single-turn (~5-15 min per rollout)
-but produces dramatically better patches.
-
-To disable agentic mode and use single-turn generation:
-Set agentic_mode=False in actor config below.
+Based on sweep_qwen3_4b_cooperbench.py but uses FlinkDualRlooLearnerConfig
+for dual-model role-masked gradient routing. Verifier/judge roles are frozen;
+only solver tokens receive gradients.
 
 Usage:
     # Preview (no submission)
     PYTHONPATH=/mnt/data/terry/repos/post_training/src:/mnt/data/terry/home/reward-training \
         /mnt/data/terry/repos/post_training/.venv/bin/python \
-        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench.py start
+        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench_dual.py start
 
     # Submit to cluster
     PYTHONPATH=/mnt/data/terry/repos/post_training/src:/mnt/data/terry/home/reward-training \
         /mnt/data/terry/repos/post_training/.venv/bin/python \
-        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench.py --submit start
+        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench_dual.py --submit start
 """
 from __future__ import annotations
 
@@ -30,9 +26,9 @@ from post_training.canonicals import sweep_base
 from post_training.flink import flink_zord
 from post_training.flink.components import flink_reward_model
 from post_training.flink.components.flink_comb_actor import FlinkCombActorConfig
+from post_training.flink.components.flink_dual_rloo_learner import FlinkDualRlooLearnerConfig
 from post_training.flink.components.flink_eval import FlinkEvalConfig
 from post_training.flink.components.flink_input_data_preprocessors import CombItemsPreprocessorConfig
-from post_training.flink.components.flink_learner_rloo import FlinkRlooLearnerConfig
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
@@ -46,8 +42,13 @@ NUM_SAMPLING_GPUS = _PROFILE.num_sampling_gpus       # 8
 MAX_SEQUENCE_LENGTH = _PROFILE.max_sequence_length   # 4096
 CKPT_PATH = _PROFILE.ckpt_path
 
+# Dual-model: same checkpoint for both solver and verifier
+SOLVER_CKPT_PATH = CKPT_PATH
+VERIFIER_CKPT_PATH = CKPT_PATH
+FREEZE_ROLES: list[str] = ["verifier", "judge"]
+
 # Paths
-RUN_CONFIG_PATH = "${HOME}/reward-training/run_configs/qwen3_4b_cooperbench.run"
+RUN_CONFIG_PATH = "/mnt/data/terry/home/cooperbench-dual/run_configs/qwen3_4b_cooperbench.run"
 K8S_SECRETS_PATH = "${HOME}/repos/secrets_template.toml"
 WANDB_PROJECT = "multiagent-debate-rl"
 PRIORITY_CLASS = "dev-low"
@@ -58,17 +59,17 @@ _VLLM_SIDECAR = "vllm"
 _VLLM_PORT = 8000
 _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
-# Training params: 50 steps (reduced from 100 — each agentic step takes much longer)
-_TOTAL_TRAIN_STEPS = 50
+# Training params
+_TOTAL_TRAIN_STEPS = 100
 _EXPORT_EVERY_STEPS = 1
-_TRAIN_BATCH_SIZE = 4
-_EVAL_BATCH_SIZE = 4
-_GENERATIONS_PER_PROMPT = 4
+_TRAIN_BATCH_SIZE = 2
+_EVAL_BATCH_SIZE = 2
+_GENERATIONS_PER_PROMPT = 2
 
 
-class Qwen3_4bCooperBench(sweep_base.Sweep):
+class Qwen3_4bCooperBenchDual(sweep_base.Sweep):
     settings: sweep.SweepSettings = sweep.SweepSettings(
-        sweep_output_path="${HOME}/sweep_jobs/qwen3_4b_cooperbench/",
+        sweep_output_path="${HOME}/sweep_jobs/qwen3_4b_cooperbench_dual/",
         cluster=sweep.Cluster.cw_us_east_04_prod,
     )
     fax: sweep.FaxConfig = sweep_base.PostTraining(
@@ -80,8 +81,27 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
         run_config=RUN_CONFIG_PATH,
         k8s_env_secrets_toml=K8S_SECRETS_PATH,
         ckpt_path=CKPT_PATH,
-        output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/qwen3-4b-cooperbench/${SWEEP_NAME}/${TRIAL_IDX}",
+        output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/qwen3-4b-cooperbench-dual/${SWEEP_NAME}/${TRIAL_IDX}",
         patch_run_config=dict(
+            wandb=dict(
+                project_name=WANDB_PROJECT,
+                tags=["marti", "qwen3-4b", "dual", "cooperbench", "freeze_verifier"],
+            ),
+            metadata=dict(
+                multi_model=dict(
+                    enabled=True,
+                    solver_ckpt=SOLVER_CKPT_PATH,
+                    verifier_ckpt=VERIFIER_CKPT_PATH,
+                    freeze_roles=FREEZE_ROLES,
+                    mode="freeze_verifier",
+                ),
+            ),
+            advanced_logging=dict(
+                enabled=True,
+                norm_granularity=["global"],
+                norm_target_trees=["grad", "update"],
+                log_histograms=False,
+            ),
             train_batch_size=_TRAIN_BATCH_SIZE,
             eval_batch_size=_EVAL_BATCH_SIZE,
             total_train_steps=_TOTAL_TRAIN_STEPS,
@@ -111,6 +131,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     },
                 },
             },
+            log_grad_norms=True,
             n_last_ckpts_to_keep=2,
             checkpoint_every_steps=25,
             minizord=flink_zord.FlinkZordConfig(
@@ -142,37 +163,31 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 input_data_preprocessor=CombItemsPreprocessorConfig(
                     env_name_remap={},
                     patch_data_item={},
-                    patch_scenario_config={
-                        "cooperbench": {
-                            "docker_timeout": 300,
-                        },
-                    },
+                    patch_scenario_config={},
                 ),
                 actor=FlinkCombActorConfig(
                     sampler_endpoint_key="sampler_key",
-                    agentic_mode=True,
-                    agentic_max_iterations=20,
-                    agentic_rollout_timeout=900,  # 15 min per rollout
-                    agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 actors_queue_batches=32,
                 eval_actors_queue_batches=32,
-                learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
+                # KEY: FlinkDualRlooLearnerConfig for dual-model training
+                learner=FlinkDualRlooLearnerConfig(
+                    policy_gradient_loss="grpo",
+                    solver_ckpt=SOLVER_CKPT_PATH,
+                    verifier_ckpt=VERIFIER_CKPT_PATH,
+                    freeze_roles=FREEZE_ROLES,
+                ),
                 actor_outputs_streamers=[
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=_GENERATIONS_PER_PROMPT,
                     ),
                 ],
                 eval=FlinkEvalConfig(
-                    n_generation_steps=-1,
+                    n_generation_steps=2,
                     actor=FlinkCombActorConfig(
                         sampler_endpoint_key="eval_sampler_key",
                         patch_number_of_generation_per_prompt=1,
-                        agentic_mode=True,
-                        agentic_max_iterations=20,
-                        agentic_rollout_timeout=900,
-                        agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                     ),
                 ),
                 log_train_generations_every_steps=1,
@@ -194,10 +209,9 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
             first_step_to_profile=1,
             read_extra_state=False,
         ),
-        retries=0,
+        retries=1,
         kjobs_compute="",
         patch_kjobs_compute=dict(
-            experimental_needs_docker_in_docker=True,
             env={
                 "JAX_COMPILATION_CACHE_DIR": "/data/1d/jax-cache/${USER}",
                 "JAX_LOG_COMPILES": "1",
@@ -233,4 +247,4 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
 
 
 if __name__ == "__main__":
-    sweep.cli.run_sweep_with_flags(Qwen3_4bCooperBench(), debugging_artefacts=[__file__])
+    sweep.cli.run_sweep_with_flags(Qwen3_4bCooperBenchDual(), debugging_artefacts=[__file__])
