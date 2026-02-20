@@ -64,7 +64,7 @@ _TOTAL_TRAIN_STEPS = 100
 _EXPORT_EVERY_STEPS = 1
 _TRAIN_BATCH_SIZE = 2
 _EVAL_BATCH_SIZE = 2
-_GENERATIONS_PER_PROMPT = 2
+_GENERATIONS_PER_PROMPT = 4
 
 
 class Qwen3_4bCooperBenchDual(sweep_base.Sweep):
@@ -212,6 +212,7 @@ class Qwen3_4bCooperBenchDual(sweep_base.Sweep):
         retries=1,
         kjobs_compute="",
         patch_kjobs_compute=dict(
+            experimental_needs_docker_in_docker=True,
             env={
                 "JAX_COMPILATION_CACHE_DIR": "/data/1d/jax-cache/${USER}",
                 "JAX_LOG_COMPILES": "1",
