@@ -66,9 +66,18 @@ _VLLM_SIDECAR = "vllm"
 _VLLM_PORT = 8000
 _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
+# Async Rollout-Train Decoupling:
+# The Flink pipeline decouples rollout generation from gradient updates via queues.
+# actors_queue_batches controls pipeline depth (how far ahead rollouts run).
+# export_every_steps controls weight freshness for vLLM sidecar.
+# Staleness = current_train_step - rollout_policy_step, bounded by queue depth.
+# Target: 2-3 steps of staleness for 42% throughput improvement (Async-GRPO).
+
 # Training params: 50 steps (reduced from 100 — each agentic step takes much longer)
 _TOTAL_TRAIN_STEPS = 50
-_EXPORT_EVERY_STEPS = 1
+# Export weights every 2 steps to reduce export overhead.
+# Rollouts using 1-step-old weights is acceptable (staleness ~2).
+_EXPORT_EVERY_STEPS = 2
 _TRAIN_BATCH_SIZE = 4
 _EVAL_BATCH_SIZE = 4
 _GENERATIONS_PER_PROMPT = 4
@@ -121,7 +130,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 "loss": {
                     "kwargs": {
                         "rl_training_steps": 1,
-                        "hard_update_ref_every_steps": 1,
+                        "hard_update_ref_every_steps": _EXPORT_EVERY_STEPS,  # Must match export_every_steps
                         "preference": {
                             "loss_variation": _LOSS_VARIATION,
                             "beta": 0.03,
@@ -179,6 +188,10 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
+                # Pipeline depth for async rollout-train decoupling.
+                # Higher values = more overlap between rollout generation and training.
+                # With 4 gens/prompt and batch_size=4, 32 queue batches means ~128 trajectories
+                # can be buffered, allowing rollout workers to run 2-3 training steps ahead.
                 actors_queue_batches=32,
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
