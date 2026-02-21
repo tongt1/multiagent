@@ -16,6 +16,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.training.multi_model.advantage_alignment import AdvantageAlignmentConfig
+
+# Reward strategy is optional -- may not be available on cluster if
+# reward_strategy_adapter.py is not deployed. Guarded import to prevent
+# import chain failures.
+try:
+    from src.training.multi_model.reward_strategy_adapter import RewardStrategyConfig
+    _HAS_REWARD_STRATEGY = True
+except ImportError:
+    _HAS_REWARD_STRATEGY = False
+    RewardStrategyConfig = None
+
 VALID_ROLES = frozenset({"solver", "verifier", "judge"})
 
 
@@ -33,6 +45,9 @@ class MultiModelConfig:
         verifier_model_size: Informational size label (e.g., "3B"). Used for GPU partitioning.
         freeze_roles: List of role names whose model receives no gradient updates.
             Valid values: "solver", "verifier", "judge".
+        advantage_alignment: Configuration for advantage alignment between models.
+        reward_strategy: Configuration for reward shaping strategy (optional, requires
+            reward_strategy_adapter.py to be deployed).
     """
 
     solver_ckpt: str | None = None
@@ -40,6 +55,15 @@ class MultiModelConfig:
     solver_model_size: str | None = None
     verifier_model_size: str | None = None
     freeze_roles: list[str] = field(default_factory=list)
+    advantage_alignment: AdvantageAlignmentConfig = field(
+        default_factory=AdvantageAlignmentConfig
+    )
+    reward_strategy: object | None = field(default=None)
+
+    def __post_init__(self) -> None:
+        """Initialize reward_strategy with default if module is available."""
+        if self.reward_strategy is None and _HAS_REWARD_STRATEGY:
+            self.reward_strategy = RewardStrategyConfig()
 
     @property
     def is_multi_model(self) -> bool:

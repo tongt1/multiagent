@@ -16,8 +16,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
+from src.training.multi_model.advantage_alignment import compute_aligned_advantages
 from src.training.multi_model.config import MultiModelConfig
 from src.training.multi_model.model_manager import MultiModelManager
+
+# Reward strategy is optional -- may not be available on cluster
+try:
+    from src.training.multi_model.reward_strategy_adapter import RewardStrategyAdapter
+    _HAS_REWARD_STRATEGY = True
+except ImportError:
+    _HAS_REWARD_STRATEGY = False
+    RewardStrategyAdapter = None
 
 
 @dataclass
@@ -134,6 +145,118 @@ class DualLearnerConfig:
             "end_lr": self.base_end_lr,
             "warmup_steps": 0,
         }
+
+    def align_advantages(
+        self,
+        solver_advantages: np.ndarray,
+        verifier_advantages: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Apply advantage alignment if enabled in config.
+
+        Implements the integration point described in AA-02: advantage alignment
+        loss plugs into the dual learner's GRPO objective as a configurable option.
+
+        Args:
+            solver_advantages: GRPO advantages for solver, shape [B].
+            verifier_advantages: GRPO advantages for verifier, shape [B].
+
+        Returns:
+            Tuple of (aligned_solver_advantages, aligned_verifier_advantages).
+            If alignment is disabled or single-model mode, returns inputs unchanged.
+        """
+        aa_config = self.multi_model_config.advantage_alignment
+        if not aa_config.enabled or not self.multi_model_config.is_multi_model:
+            return solver_advantages, verifier_advantages
+        return compute_aligned_advantages(solver_advantages, verifier_advantages, aa_config)
+
+    def compute_alignment_metrics(
+        self,
+        solver_adv: np.ndarray,
+        verifier_adv: np.ndarray,
+        aligned_solver_adv: np.ndarray,
+        aligned_verifier_adv: np.ndarray,
+    ) -> dict[str, float]:
+        """Compute advantage alignment monitoring metrics.
+
+        Returns metrics tracking the magnitude of the alignment correction,
+        aligned advantage means, and configuration values for W&B logging.
+
+        Args:
+            solver_adv: Original solver advantages, shape [B].
+            verifier_adv: Original verifier advantages, shape [B].
+            aligned_solver_adv: Aligned solver advantages, shape [B].
+            aligned_verifier_adv: Aligned verifier advantages, shape [B].
+
+        Returns:
+            Dict of alignment metrics. Empty dict if alignment is disabled
+            or single-model mode.
+        """
+        aa_config = self.multi_model_config.advantage_alignment
+        if not aa_config.enabled or not self.multi_model_config.is_multi_model:
+            return {}
+        return {
+            "advantage_alignment/solver_alignment_term": float(
+                np.mean(aligned_solver_adv - solver_adv)
+            ),
+            "advantage_alignment/verifier_alignment_term": float(
+                np.mean(aligned_verifier_adv - verifier_adv)
+            ),
+            "advantage_alignment/solver_aligned_mean": float(
+                np.mean(aligned_solver_adv)
+            ),
+            "advantage_alignment/verifier_aligned_mean": float(
+                np.mean(aligned_verifier_adv)
+            ),
+            "advantage_alignment/beta": float(aa_config.beta),
+            "advantage_alignment/enabled": 1.0,
+        }
+
+    def shape_rewards(
+        self,
+        rewards: np.ndarray,
+        role_masks: dict[str, np.ndarray] | None = None,
+        trajectory_metadata: list[dict] | None = None,
+    ) -> dict[str, np.ndarray]:
+        """Apply reward shaping strategy to batch rewards.
+
+        Uses the RewardStrategyAdapter to transform raw rewards through
+        the configured strategy. Same strategy is applied to both roles.
+        Frozen roles receive passthrough (unshaped) rewards.
+
+        Pipeline position: called BEFORE advantage computation.
+        raw_rewards -> shape_rewards() -> compute_advantages -> align_advantages()
+
+        Args:
+            rewards: Shape (B,) raw reward per rollout.
+            role_masks: Optional per-role boolean masks from batch.data.
+            trajectory_metadata: Optional per-rollout metadata.
+
+        Returns:
+            Dict with keys "solver", "verifier", "judge", each np.ndarray (B,).
+            If reward strategy is not available, returns passthrough rewards for all roles.
+        """
+        if not _HAS_REWARD_STRATEGY:
+            # Passthrough: same rewards for all roles when adapter not available
+            return {"solver": rewards.copy(), "verifier": rewards.copy(), "judge": rewards.copy()}
+
+        if not hasattr(self, "_reward_adapter"):
+            self._reward_adapter = RewardStrategyAdapter(
+                config=self.multi_model_config.reward_strategy,
+                freeze_roles=list(self.multi_model_config.freeze_roles),
+            )
+        return self._reward_adapter.shape_rewards(rewards, role_masks, trajectory_metadata)
+
+    def get_reward_strategy_name(self) -> str:
+        """Return the active reward strategy name for W&B tagging."""
+        if not _HAS_REWARD_STRATEGY:
+            return "passthrough"
+
+        if not hasattr(self, "_reward_adapter"):
+            self._reward_adapter = RewardStrategyAdapter(
+                config=self.multi_model_config.reward_strategy,
+                freeze_roles=list(self.multi_model_config.freeze_roles),
+            )
+        return self._reward_adapter.name
 
     def _get_override_for_key(self, model_key: str) -> PerModelOptimizerConfig | None:
         """Get the per-model optimizer override for a model key, if any.
