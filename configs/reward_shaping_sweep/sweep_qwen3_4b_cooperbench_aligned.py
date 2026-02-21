@@ -226,7 +226,7 @@ class Qwen3_4bCooperBenchAligned(sweep_base.Sweep):
                 "JAX_LOG_COMPILES": "1",
                 "PYTHONUNBUFFERED": "1",
                 "PYTHONFAULTHANDLER": "1",
-                "PYTHONPATH": "${PYTHONPATH:+${PYTHONPATH}:}${HOME}/repos/multiagent",
+                "PYTHONPATH": "${HOME}/repos/multiagent",
             },
         ),
         sidecars=[
