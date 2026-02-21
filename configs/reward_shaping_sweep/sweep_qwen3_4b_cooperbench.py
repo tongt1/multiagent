@@ -77,9 +77,10 @@ _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
 # Training params: 250 steps for stability validation (Phase 3)
 _TOTAL_TRAIN_STEPS = 250
-# Export weights every 2 steps to reduce export overhead.
-# Rollouts using 1-step-old weights is acceptable (staleness ~2).
-_EXPORT_EVERY_STEPS = 2
+# Export weights every 5 steps to avoid JAX array deletion race condition.
+# The async HF export can fail if training GC's params before export completes.
+# With agentic rollouts taking 5-15 min per batch, 5-step staleness is negligible.
+_EXPORT_EVERY_STEPS = 5
 _TRAIN_BATCH_SIZE = 16  # 4 prompts x 4 gens/prompt for batch diversity (STAB-01)
 _EVAL_BATCH_SIZE = 4
 _GENERATIONS_PER_PROMPT = 4
@@ -204,7 +205,11 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                     max_concurrent_trajectories=0,  # 0 = default to num_unrolls * redundancy_factor
                     agentic_redundancy_factor=_REDUNDANCY_FACTOR,
-                    agentic_temperature=0.8,  # Phase 3 (STAB-03): configurable agent LLM temperature
+                    agentic_temperature=0.8,  # Fallback if schedule is None
+                    # Per-generation temperature diversity: breaks identical-reward problem.
+                    # Low temp (0.6) = conservative/deterministic, high temp (1.2) = exploratory.
+                    # Ensures GRPO gets varied rewards across generations for non-zero gradient.
+                    agentic_temperature_schedule=[0.6, 0.8, 1.0, 1.2],
                 ),
                 num_actors_per_batch_item=_GENERATIONS_PER_PROMPT,
                 # Pipeline depth for async rollout-train decoupling.
