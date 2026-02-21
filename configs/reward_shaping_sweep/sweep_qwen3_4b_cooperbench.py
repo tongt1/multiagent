@@ -41,10 +41,11 @@ from post_training.flink.components.flink_learner_rloo import FlinkRlooLearnerCo
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
-from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
-from post_training.flink.components.flink_learning_filter.filter_dapo_degenerate import FilterDapoDegenerateConfig
-from post_training.flink.components.flink_learning_filter import FilterMode, FilterMultiplexerConfig
-from post_training.flink.components.flink_learning_filter.filter_zero_variance_group import FilterZeroVarianceGroupConfig
+# Filters disabled for cold-start — see actor_outputs_streamers comment below
+# from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
+# from post_training.flink.components.flink_learning_filter.filter_dapo_degenerate import FilterDapoDegenerateConfig
+# from post_training.flink.components.flink_learning_filter import FilterMode, FilterMultiplexerConfig
+# from post_training.flink.components.flink_learning_filter.filter_zero_variance_group import FilterZeroVarianceGroupConfig
 
 from configs.model_profiles import QWEN3_4B_INSTRUCT
 
@@ -214,30 +215,13 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
-                    # DAPO compact filter: drops degenerate agentic trajectories before
-                    # advantage computation. Remove this entry to disable DAPO filtering
-                    # (e.g. when using _LOSS_VARIATION="grpo" or "gspo").
-                    FilteringStreamerConfig(
-                        filter=FilterDapoDegenerateConfig(
-                            filter_mode=FilterMode.ONLY,
-                            min_valid_per_group=_DAPO_MIN_VALID_PER_GROUP,
-                            max_batch_mask_ratio=_DAPO_MAX_BATCH_MASK_RATIO,
-                        ),
-                    ),
-                    # Phase 3 (STAB-02): Zero-variance prompt group filter.
-                    # Drops entire prompt groups where all generations have identical
-                    # reward (within epsilon), which produce zero GRPO advantage.
-                    FilteringStreamerConfig(
-                        filter=FilterMultiplexerConfig(
-                            filter_mode=FilterMode.ALL,
-                            filter_configs=[
-                                FilterZeroVarianceGroupConfig(
-                                    filter_mode=FilterMode.ALL,
-                                    epsilon=0.01,
-                                ),
-                            ],
-                        ),
-                    ),
+                    # NOTE: DapoFilter and ZeroVarianceFilter DISABLED for cold-start.
+                    # At cold start, an untrained model produces mostly reward=0 trajectories.
+                    # Both filters drop all-zero-reward prompt groups, causing the
+                    # FilteringStreamer to loop forever and the learner to starve (no
+                    # training steps execute). The DAPO loss handles zero-gradient items
+                    # naturally — these filters are an optimization, not correctness.
+                    # Re-enable once the model starts producing mixed-reward batches.
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=_GENERATIONS_PER_PROMPT,
                     ),
