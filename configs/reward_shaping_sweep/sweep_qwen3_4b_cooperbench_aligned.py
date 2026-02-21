@@ -68,7 +68,7 @@ _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 # Training params
 _TOTAL_TRAIN_STEPS = 100
 _EXPORT_EVERY_STEPS = 1
-_TRAIN_BATCH_SIZE = 2
+_TRAIN_BATCH_SIZE = 8  # Must be multiple of _GENERATIONS_PER_PROMPT for batch metrics reshape
 _EVAL_BATCH_SIZE = 2
 _GENERATIONS_PER_PROMPT = 4
 
