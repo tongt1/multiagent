@@ -43,7 +43,7 @@ QWEN3_4B_INSTRUCT = ModelProfile(
     ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
     num_training_gpus=8,
     num_sampling_gpus=8,
-    max_sequence_length=4096,
+    max_sequence_length=8192,
     needs_mesh_override=False,
 )
 
@@ -51,7 +51,7 @@ QWEN3_4B_INSTRUCT_6GPU = ModelProfile(
     ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
     num_training_gpus=4,
     num_sampling_gpus=2,
-    max_sequence_length=4096,
+    max_sequence_length=8192,
     needs_mesh_override=False,
 )
 
@@ -59,7 +59,15 @@ QWEN3_4B_INSTRUCT_4GPU = ModelProfile(
     ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
     num_training_gpus=2,
     num_sampling_gpus=2,
-    max_sequence_length=4096,
+    max_sequence_length=8192,
+    needs_mesh_override=False,
+)
+
+QWEN3_4B_INSTRUCT_12GPU = ModelProfile(
+    ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
+    num_training_gpus=8,
+    num_sampling_gpus=4,
+    max_sequence_length=8192,
     needs_mesh_override=False,
 )
 
@@ -67,6 +75,6 @@ QWEN3_4B_INSTRUCT_2GPU = ModelProfile(
     ckpt_path="gs://cohere-dev-central-2/users/terry/qwen3-4b-instruct/megazord_weights/ckpt-0",
     num_training_gpus=1,
     num_sampling_gpus=1,
-    max_sequence_length=4096,
+    max_sequence_length=8192,
     needs_mesh_override=False,
 )

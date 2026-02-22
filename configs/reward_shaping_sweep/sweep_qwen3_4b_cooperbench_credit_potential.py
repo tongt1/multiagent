@@ -16,9 +16,9 @@ from post_training.flink.components.flink_input_data_preprocessors import CombIt
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
-from configs.model_profiles import QWEN3_4B_INSTRUCT_6GPU
+from configs.model_profiles import QWEN3_4B_INSTRUCT_12GPU
 
-_P = QWEN3_4B_INSTRUCT_6GPU; _V = "vllm"; _VP = 8000
+_P = QWEN3_4B_INSTRUCT_12GPU; _V = "vllm"; _VP = 8000
 _VD = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 _S = 500; _E = 5; _B = 16; _G = 1; _T = 20; _R = 2.0
 
@@ -32,7 +32,7 @@ class Qwen3_4bCreditPotential(sweep_base.Sweep):
         output_dir="s3://us-east-01a/30d/post-training/${USER}/multiagent-debate-rl/qwen3-4b-cooperbench-6gpu/${SWEEP_NAME}/${TRIAL_IDX}",
         patch_run_config=dict(
             train_batch_size=_B, eval_batch_size=4, total_train_steps=_S, max_sequence_length=_P.max_sequence_length,
-            sharding={"n_tensor_parallel": _P.num_training_gpus}, validation_every_steps=100, n_gradient_accumulation_steps=2,
+            sharding={"n_tensor_parallel": 4}, validation_every_steps=100, n_gradient_accumulation_steps=2,
             lr_schedule={"kwargs": {"warmup_steps": 20, "total_steps": _S, "peak_lr": 1e-6, "end_lr": 1e-7}}, seed=42,
             objective={"loss": {"kwargs": {"rl_training_steps": 1, "hard_update_ref_every_steps": _E, "preference": {
                 "loss_variation": "dapo", "use_reference_policy": False, "beta": 0.0, "avg_loglikelihood": False,
@@ -52,7 +52,7 @@ class Qwen3_4bCreditPotential(sweep_base.Sweep):
                 actor=FlinkCombActorConfig(sampler_endpoint_key="sampler_key", agentic_mode=True, agentic_max_iterations=_T,
                     agentic_rollout_timeout=900, agentic_vllm_base_url=f"http://{_V}:{_VP}/v1",
                     max_concurrent_trajectories=0, agentic_redundancy_factor=_R, agentic_temperature=1.0),
-                num_actors_per_batch_item=8, actors_queue_batches=64, eval_actors_queue_batches=32,
+                num_actors_per_batch_item=4, actors_queue_batches=32, eval_actors_queue_batches=32,
                 learner=FlinkDualRlooLearnerConfig(policy_gradient_loss="grpo", solver_ckpt=_P.ckpt_path,
                     verifier_ckpt=_P.ckpt_path, freeze_roles=["verifier", "judge"]),
                 actor_outputs_streamers=[DebateMetricStreamerConfig(n_rollouts_per_prompt=_G,

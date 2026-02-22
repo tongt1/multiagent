@@ -16,9 +16,9 @@ from post_training.flink.components.flink_input_data_preprocessors import CombIt
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
-from configs.model_profiles import QWEN3_4B_INSTRUCT_6GPU
+from configs.model_profiles import QWEN3_4B_INSTRUCT_12GPU
 
-_PROFILE = QWEN3_4B_INSTRUCT_6GPU
+_PROFILE = QWEN3_4B_INSTRUCT_12GPU
 NUM_TRAINING_GPUS = _PROFILE.num_training_gpus
 NUM_SAMPLING_GPUS = _PROFILE.num_sampling_gpus
 MAX_SEQUENCE_LENGTH = _PROFILE.max_sequence_length
@@ -63,7 +63,7 @@ class Qwen3_4bCooperBenchDualNoAA(sweep_base.Sweep):
             eval_batch_size=_EVAL_BATCH_SIZE,
             total_train_steps=_TOTAL_TRAIN_STEPS,
             max_sequence_length=MAX_SEQUENCE_LENGTH,
-            sharding={"n_tensor_parallel": NUM_TRAINING_GPUS},
+            sharding={"n_tensor_parallel": 4},
             validation_every_steps=100,
             n_gradient_accumulation_steps=2,
             lr_schedule={"kwargs": {"warmup_steps": 20, "total_steps": _TOTAL_TRAIN_STEPS, "peak_lr": 1e-6, "end_lr": 1e-7}},
@@ -112,8 +112,8 @@ class Qwen3_4bCooperBenchDualNoAA(sweep_base.Sweep):
                     max_concurrent_trajectories=0, agentic_redundancy_factor=_REDUNDANCY_FACTOR,
                     agentic_temperature=1.0,
                 ),
-                num_actors_per_batch_item=8,
-                actors_queue_batches=64,
+                num_actors_per_batch_item=4,
+                actors_queue_batches=32,
                 eval_actors_queue_batches=32,
                 # KEY: Dual-model learner with frozen verifier
                 learner=FlinkDualRlooLearnerConfig(

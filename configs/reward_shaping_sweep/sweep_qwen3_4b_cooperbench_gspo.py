@@ -169,8 +169,8 @@ class Qwen3_4bCooperBenchGspo(sweep_base.Sweep):
                     agentic_redundancy_factor=_REDUNDANCY_FACTOR,
                     agentic_temperature=1.0,
                 ),
-                num_actors_per_batch_item=8,
-                actors_queue_batches=64,
+                num_actors_per_batch_item=4,
+                actors_queue_batches=32,
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
