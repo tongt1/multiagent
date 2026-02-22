@@ -1,34 +1,23 @@
-"""Qwen3-4B CooperBench: Agentic mode with DAPO loss and Docker-based verifiable rewards.
+"""Qwen3-4B CooperBench: GSPO+DAPO hybrid — sequence-level clipping with DAPO-inspired settings.
 
-Agentic mode: Model interacts with code through OpenHands tools (bash, file editor)
-across multiple turns. Each generation runs an agent loop in a Docker container
-pointed at the vLLM sidecar. Much slower than single-turn (~5-15 min per rollout)
-but produces dramatically better patches.
+GSPO (Group Sequence Policy Optimization) clips the summed log-ratio at the
+sequence level, unlike DAPO which clips per-token. This hybrid keeps DAPO's
+other innovations: no KL penalty, asymmetric clipping, no std normalization.
 
-DAPO loss (default): Masks degenerate trajectories (timeouts, container errors, zero
-reward, max turns), normalizes by max_sequence_length (no length bias), and clips
-overlong trajectories. Set _LOSS_VARIATION to "grpo" or "gspo" to use standard
-loss variants instead.
-
-To disable agentic mode and use single-turn generation:
-Set agentic_mode=False in actor config below.
+Comparison with parallel runs:
+- jetuse:  DAPO + old settings (KL, symmetric clip)
+- ecopaw:  DAPO + no KL + asymmetric clip
+- THIS:    GSPO + no KL + asymmetric clip (sequence-level ratio)
 
 Usage:
-    # Preview (no submission)
     PYTHONPATH=/mnt/data/terry/repos/post_training/src:/mnt/data/terry/home/reward-training \
         /mnt/data/terry/repos/post_training/.venv/bin/python \
-        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench.py start
-
-    # Submit to cluster
-    PYTHONPATH=/mnt/data/terry/repos/post_training/src:/mnt/data/terry/home/reward-training \
-        /mnt/data/terry/repos/post_training/.venv/bin/python \
-        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench.py --submit start
+        configs/reward_shaping_sweep/sweep_qwen3_4b_cooperbench_gspo.py --submit start
 """
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-# import configs._image_reuse  # noqa: F401  -- set_reuse_image_tag not in sweep module
 import sweep
 
 from post_training.canonicals import sweep_base
@@ -41,11 +30,6 @@ from post_training.flink.components.flink_learner_rloo import FlinkRlooLearnerCo
 from post_training.flink.components.flink_sampler_vllm_sidecar import FlinkVllmSidecarSamplerConfig
 from post_training.flink.utils.endpoint_resolver import EndpointResolverConfig
 from post_training.flink.components.debate_enrichment import DebateMetricStreamerConfig
-# Filters disabled for cold-start — see actor_outputs_streamers comment below
-# from post_training.flink.components.flink_learning_filter.filtering_streamer import FilteringStreamerConfig
-# from post_training.flink.components.flink_learning_filter.filter_dapo_degenerate import FilterDapoDegenerateConfig
-# from post_training.flink.components.flink_learning_filter import FilterMode, FilterMultiplexerConfig
-# from post_training.flink.components.flink_learning_filter.filter_zero_variance_group import FilterZeroVarianceGroupConfig
 
 from configs.model_profiles import QWEN3_4B_INSTRUCT_6GPU
 
@@ -68,47 +52,22 @@ _VLLM_SIDECAR = "vllm"
 _VLLM_PORT = 8000
 _VLLM_EXPORT_DIR = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 
-# Async Rollout-Train Decoupling:
-# The Flink pipeline decouples rollout generation from gradient updates via queues.
-# actors_queue_batches controls pipeline depth (how far ahead rollouts run).
-# export_every_steps controls weight freshness for vLLM sidecar.
-# Staleness = current_train_step - rollout_policy_step, bounded by queue depth.
-# Target: 2-3 steps of staleness for 42% throughput improvement (Async-GRPO).
-
-# Training params: 500 steps for full training run
+# Training params
 _TOTAL_TRAIN_STEPS = 500
-# Export weights every 5 steps to avoid JAX array deletion race condition.
-# The async HF export can fail if training GC's params before export completes.
-# With agentic rollouts taking 5-15 min per batch, 5-step staleness is negligible.
 _EXPORT_EVERY_STEPS = 5
-_TRAIN_BATCH_SIZE = 16  # 16 unique prompts, 1 gen each (agentic outputs are deterministic across temps)
+_TRAIN_BATCH_SIZE = 16
 _EVAL_BATCH_SIZE = 4
-_GENERATIONS_PER_PROMPT = 1  # GRPO with group-size-1: batch-level normalization provides gradient signal
+_GENERATIONS_PER_PROMPT = 1
 
-# DAPO / Loss configuration
-# To revert to standard GRPO/GSPO, change _LOSS_VARIATION and remove FilteringStreamerConfig
-# from actor_outputs_streamers below. All other config stays the same.
-_LOSS_VARIATION = "dapo"                    # "dapo" | "grpo" | "gspo" | "grpo_use_ref_policy_as_pi_old" | "gspo_use_ref_policy_as_pi_old"
-_TEMPERATURE_TRAIN = 1.0                    # sampling temperature for training rollouts
-_TEMPERATURE_EVAL = 0.6                     # sampling temperature for eval rollouts
-_MAX_TURNS = 20                             # agentic_max_iterations
-_DAPO_OVERLONG_COEFF = 0.5                  # halve gradient for overlong sequences
-_DAPO_OVERLONG_THRESHOLD = 0.9              # trigger overlong clipping at 90% of max_sequence_length
-_DAPO_MIN_VALID_PER_GROUP = 1               # 1 gen per prompt, batch-level normalization
-_DAPO_MAX_BATCH_MASK_RATIO = 0.75           # skip step if >75% masked (higher tolerance with 1 gen/prompt)
-_REDUNDANCY_FACTOR = 2.0                     # 2x rollouts for failure tolerance (high agentic failure rate)
-
-# Phase 5: Docker Warmup and Rollout Speed Optimizations
-# =====================================================
-# 1. Container Pool: Docker containers persist across rollouts (no cold-start)
-# 2. Async Decoupling: actors_queue_batches=32 keeps rollouts ahead of trainer
-# 3. Weight Export: export_every_steps=2 with async background export
-# 4. Trajectory Dispatch: Fine-grained interleaving via AgenticTrajectoryDispatcher
-# 5. Redundant Rollouts: redundancy_factor=1.25 handles ~39% agentic failure rate
-# 6. Rollout Timing: Per-task duration tracked for future sorted batching
+# GSPO+DAPO hybrid: sequence-level ratio with DAPO-inspired settings
+_LOSS_VARIATION = "gspo"                     # GSPO: sequence-level ratio clipping
+_TEMPERATURE_TRAIN = 1.0
+_TEMPERATURE_EVAL = 0.6
+_MAX_TURNS = 20
+_REDUNDANCY_FACTOR = 2.0
 
 
-class Qwen3_4bCooperBench(sweep_base.Sweep):
+class Qwen3_4bCooperBenchGspo(sweep_base.Sweep):
     settings: sweep.SweepSettings = sweep.SweepSettings(
         sweep_output_path="${HOME}/sweep_jobs/qwen3_4b_cooperbench/",
         cluster=sweep.Cluster.cw_us_east_04_prod,
@@ -130,7 +89,7 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
             max_sequence_length=MAX_SEQUENCE_LENGTH,
             sharding={"n_tensor_parallel": NUM_TRAINING_GPUS},
             validation_every_steps=100,
-            n_gradient_accumulation_steps=2,  # Effective batch of 32 (STAB-01)
+            n_gradient_accumulation_steps=2,
             lr_schedule={
                 "kwargs": {
                     "warmup_steps": 20,
@@ -144,21 +103,17 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                 "loss": {
                     "kwargs": {
                         "rl_training_steps": 1,
-                        "hard_update_ref_every_steps": _EXPORT_EVERY_STEPS,  # Must match export_every_steps
+                        "hard_update_ref_every_steps": _EXPORT_EVERY_STEPS,
                         "preference": {
                             "loss_variation": _LOSS_VARIATION,
-                            "use_reference_policy": False,  # DAPO: no KL penalty
-                            "beta": 0.0,  # KL coefficient = 0 (no KL divergence term)
+                            "use_reference_policy": False,  # No KL penalty
+                            "beta": 0.0,                    # KL coefficient = 0
                             "avg_loglikelihood": False,
                             "generations_per_prompt": _GENERATIONS_PER_PROMPT,
-                            "std_normalised": False,  # DAPO: use advantage = reward - mean (no std division)
-                            # DAPO asymmetric clipping: don't clip negative ratios (let model freely
-                            # move away from bad actions), only clip positive ratios at 0.28
-                            "ppo_epsilon_low": 0.8,  # effectively no lower clip (ratio can drop to 0.2)
-                            "ppo_epsilon_high": 0.28,  # DAPO paper upper clip
-                            # DAPO-specific loss parameters
-                            "dapo_overlong_coeff": _DAPO_OVERLONG_COEFF,
-                            "dapo_overlong_threshold": _DAPO_OVERLONG_THRESHOLD,
+                            "std_normalised": False,        # advantage = reward - mean (no std division)
+                            # Asymmetric clipping (DAPO-inspired)
+                            "ppo_epsilon_low": 0.8,         # effectively no lower clip
+                            "ppo_epsilon_high": 0.28,       # DAPO paper upper clip
                         },
                     },
                 },
@@ -174,12 +129,11 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         ),
                         export_every_steps=_EXPORT_EVERY_STEPS,
                         export_dir=_VLLM_EXPORT_DIR,
-                        temperature=0.8,  # Fallback if anneal not active
-                        # Phase 3 (STAB-03): Linear temperature anneal 1.0 -> 0.6 over training
+                        temperature=0.8,
                         start_temperature=1.0,
                         end_temperature=0.6,
                         total_train_steps=_TOTAL_TRAIN_STEPS,
-                        thinking_token_budget=4096,  # Allow 4096 thinking tokens for Qwen3 reasoning
+                        thinking_token_budget=4096,
                     ),
                     eval_sampler_key=FlinkVllmSidecarSamplerConfig(
                         vllm_endpoint=EndpointResolverConfig(
@@ -209,27 +163,17 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                     sampler_endpoint_key="sampler_key",
                     agentic_mode=True,
                     agentic_max_iterations=_MAX_TURNS,
-                    agentic_rollout_timeout=900,  # 15 min per rollout
+                    agentic_rollout_timeout=900,
                     agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
-                    max_concurrent_trajectories=0,  # 0 = default to num_unrolls * redundancy_factor
+                    max_concurrent_trajectories=0,
                     agentic_redundancy_factor=_REDUNDANCY_FACTOR,
-                    agentic_temperature=1.0,  # Higher temp for exploration
-                    # Temperature schedule disabled: with 1 gen/prompt, per-gen diversity is N/A.
-                    # agentic_temperature_schedule=[0.6, 0.8, 1.0, 1.2],
+                    agentic_temperature=1.0,
                 ),
-                num_actors_per_batch_item=4,  # 4 * 8 batch_items = 32 concurrent rollouts; reduced from 8 to prevent DinD OOM
-                # Pipeline depth: with 32 concurrent actors, queue must be >= actor count.
-                actors_queue_batches=32,
+                num_actors_per_batch_item=8,
+                actors_queue_batches=64,
                 eval_actors_queue_batches=32,
                 learner=FlinkRlooLearnerConfig(policy_gradient_loss="grpo"),
                 actor_outputs_streamers=[
-                    # NOTE: DapoFilter and ZeroVarianceFilter DISABLED for cold-start.
-                    # At cold start, an untrained model produces mostly reward=0 trajectories.
-                    # Both filters drop all-zero-reward prompt groups, causing the
-                    # FilteringStreamer to loop forever and the learner to starve (no
-                    # training steps execute). The DAPO loss handles zero-gradient items
-                    # naturally — these filters are an optimization, not correctness.
-                    # Re-enable once the model starts producing mixed-reward batches.
                     DebateMetricStreamerConfig(
                         n_rollouts_per_prompt=_GENERATIONS_PER_PROMPT,
                     ),
@@ -244,8 +188,8 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
                         agentic_rollout_timeout=900,
                         agentic_vllm_base_url=f"http://{_VLLM_SIDECAR}:{_VLLM_PORT}/v1",
                         max_concurrent_trajectories=0,
-                        agentic_redundancy_factor=1.0,  # No redundancy for eval (single gen per prompt)
-                        agentic_temperature=0.8,  # Phase 3 (STAB-03): match train temperature
+                        agentic_redundancy_factor=1.0,
+                        agentic_temperature=0.8,
                     ),
                 ),
                 log_train_generations_every_steps=1,
@@ -306,4 +250,4 @@ class Qwen3_4bCooperBench(sweep_base.Sweep):
 
 
 if __name__ == "__main__":
-    sweep.cli.run_sweep_with_flags(Qwen3_4bCooperBench(), debugging_artefacts=[__file__])
+    sweep.cli.run_sweep_with_flags(Qwen3_4bCooperBenchGspo(), debugging_artefacts=[__file__])
