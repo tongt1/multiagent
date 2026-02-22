@@ -65,7 +65,7 @@ class Qwen3_4bCooperBenchBatch32(sweep_base.Sweep):
             max_sequence_length=MAX_SEQUENCE_LENGTH,
             sharding={"n_tensor_parallel": NUM_TRAINING_GPUS},
             validation_every_steps=100,
-            n_gradient_accumulation_steps=2,  # Effective batch = 64
+            n_gradient_accumulation_steps=4,  # Effective batch = 128, microbatch=8 to avoid OOM
             lr_schedule={"kwargs": {"warmup_steps": 20, "total_steps": _TOTAL_TRAIN_STEPS, "peak_lr": 1e-6, "end_lr": 1e-7}},
             seed=SEED,
             objective={"loss": {"kwargs": {
