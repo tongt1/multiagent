@@ -23,8 +23,8 @@ _VD = "/data/1d/post-training/${USER}/${SWEEP_NAME}/${TRIAL_IDX}"
 _S = 500; _E = 5; _B = 16; _G = 1; _T = 20; _R = 2.0
 
 class Qwen3_4bCreditComa(sweep_base.Sweep):
-    settings = sweep.SweepSettings(sweep_output_path="${HOME}/sweep_jobs/qwen3_4b_cooperbench/", cluster=sweep.Cluster.cw_us_east_04_prod)
-    fax = sweep_base.PostTraining(
+    settings: sweep.SweepSettings = sweep.SweepSettings(sweep_output_path="${HOME}/sweep_jobs/qwen3_4b_cooperbench/", cluster=sweep.Cluster.cw_us_east_04_prod)
+    fax: sweep.FaxConfig = sweep_base.PostTraining(
         partition=f"gpu_{_P.num_training_gpus}", queue=sweep.Queue.post_training_cohere_labs_queue, jobs_max_fanout=1,
         wandb_project="multiagent-debate-rl", priority_class="dev-low",
         run_config="${HOME}/reward-training/run_configs/qwen3_4b_cooperbench.run",
@@ -51,7 +51,7 @@ class Qwen3_4bCreditComa(sweep_base.Sweep):
                     patch_scenario_config={"cooperbench": {"docker_timeout": 60}}),
                 actor=FlinkCombActorConfig(sampler_endpoint_key="sampler_key", agentic_mode=True, agentic_max_iterations=_T,
                     agentic_rollout_timeout=900, agentic_vllm_base_url=f"http://{_V}:{_VP}/v1",
-                    max_concurrent_trajectories=0, agentic_redundancy_factor=_R, agentic_temperature=1.0),
+                    max_concurrent_trajectories=0, agentic_redundancy_factor=_R, agentic_temperature=1.0, agentic_comms_mode=True),
                 num_actors_per_batch_item=4, actors_queue_batches=32, eval_actors_queue_batches=32,
                 learner=FlinkDualRlooLearnerConfig(policy_gradient_loss="grpo", solver_ckpt=_P.ckpt_path,
                     verifier_ckpt=_P.ckpt_path, freeze_roles=["verifier", "judge"]),
@@ -61,7 +61,7 @@ class Qwen3_4bCreditComa(sweep_base.Sweep):
                     sampler_endpoint_key="eval_sampler_key", patch_number_of_generation_per_prompt=1,
                     agentic_mode=True, agentic_max_iterations=_T, agentic_rollout_timeout=900,
                     agentic_vllm_base_url=f"http://{_V}:{_VP}/v1", max_concurrent_trajectories=0,
-                    agentic_redundancy_factor=1.0, agentic_temperature=0.8)),
+                    agentic_redundancy_factor=1.0, agentic_temperature=0.8, agentic_comms_mode=True)),
                 log_train_generations_every_steps=1, save_debug_data_every_steps=1).model_dump(),
             likelihood_evals=None, finetuning=dict(lora=dict(enabled=False, rank=8, alpha=8.0)),
             ckpt=dict(force_at_init=False), validation=dict(force_at_init=False),
